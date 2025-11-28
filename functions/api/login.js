@@ -12,7 +12,8 @@ export async function onRequestPost(context) {
       });
     }
 
-    const stmt = env.DB.prepare("SELECT username, password FROM users WHERE username = ?");
+    // 查询 usage_count
+    const stmt = env.DB.prepare("SELECT username, password, usage_count FROM users WHERE username = ?");
     const user = await stmt.bind(username).first();
 
     if (!user || user.password !== password) {
@@ -22,10 +23,11 @@ export async function onRequestPost(context) {
       });
     }
 
-    // 安全更新：仅返回成功状态和用户名，绝对不返回 keys
+    // 登录成功，返回用户名和已使用次数
     return new Response(JSON.stringify({
       success: true,
-      username: user.username
+      username: user.username,
+      usageCount: user.usage_count || 0
     }), {
       status: 200,
       headers: { "Content-Type": "application/json" }

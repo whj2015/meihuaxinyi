@@ -72,4 +72,5 @@ export interface UserProfile {
   username: string;
   isLoggedIn: boolean;
   token?: string;
+  usageCount?: number; // 已使用免费额度次数
 }
