@@ -25,7 +25,7 @@ export async function onRequestPost(context) {
     const newDeepseekKey = decodeKey(deepseekHeader);
 
     if (!username || !password) {
-      return new Response(JSON.stringify({ success: false, message: "未授权" }), {
+      return new Response(JSON.stringify({ success: false, message: "请输入您的API KEY后保存，未输入只能免费解卦5次。" }), {
         status: 401,
         headers: { "Content-Type": "application/json" }
       });
