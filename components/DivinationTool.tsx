@@ -455,7 +455,7 @@ const DivinationTool: React.FC = () => {
                             <div className="w-10 h-10 rounded-xl bg-slate-800 text-white flex items-center justify-center font-serif font-bold text-lg shadow-lg shadow-slate-200">
                                 断
                             </div>
-                            <span className="font-serif font-bold text-slate-700">核心结论</span>
+                            <span className="font-serif font-bold text-slate-700">体用分析结论</span>
                         </div>
                          <div className={`px-4 py-1.5 rounded-lg text-sm font-bold border ${getScoreColor(result.relationScore)}`}>
                              {getScoreLabel(result.relationScore)}
