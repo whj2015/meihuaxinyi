@@ -53,12 +53,19 @@ export interface DivinationResult {
   movingLineText?: string; // 具体的动爻爻辞
 }
 
-export type AIProvider = 'gemini' | 'deepseek';
+export type AIProvider = 'gemini' | 'deepseek' | 'custom';
+
+export interface CustomAIConfig {
+  apiKey: string;
+  baseUrl: string;
+  modelName: string;
+}
 
 export interface AISettings {
   provider: AIProvider;
   geminiKey: string;
   deepseekKey: string;
+  customConfig?: CustomAIConfig;
 }
 
 export interface UserProfile {

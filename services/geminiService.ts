@@ -1,6 +1,6 @@
 
 import { GoogleGenAI } from "@google/genai";
-import { DivinationResult, AIProvider } from "../types";
+import { DivinationResult, AIProvider, CustomAIConfig } from "../types";
 
 // DeepSeek API 配置
 const DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions";
@@ -105,26 +105,74 @@ const callDeepSeek = async (apiKey: string, prompt: string): Promise<string> => 
 };
 
 /**
+ * 调用自定义 OpenAI 兼容接口
+ */
+const callCustomOpenAI = async (config: CustomAIConfig, prompt: string): Promise<string> => {
+  try {
+    // 确保 URL 以 /chat/completions 结尾，如果用户只给了 base url
+    let url = config.baseUrl;
+    if (!url.endsWith('/chat/completions')) {
+        // 如果以 / 结尾，去掉
+        if (url.endsWith('/')) url = url.slice(0, -1);
+        // 加上后缀 (有些用户可能直接给完整 URL，有些只给 host)
+        // 简单策略：如果还没包含 chat/completions，就加上
+        if (!url.includes('chat/completions')) {
+           url = `${url}/chat/completions`;
+        }
+    }
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${config.apiKey}`
+      },
+      body: JSON.stringify({
+        model: config.modelName || "gpt-3.5-turbo", // Fallback
+        messages: [
+          { role: "system", content: "你是一位精通周易和梅花易数的国学大师。" },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.7
+      })
+    });
+
+    if (!response.ok) {
+        throw new Error(`Custom API Error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || "大师似乎在沉思，未给出回应。";
+
+  } catch (error: any) {
+    console.error("Custom AI Error:", error);
+    throw new Error(`自定义模型连接失败: ${error.message}`);
+  }
+};
+
+/**
  * 统一获取解读接口
  */
 export const getInterpretation = async (
   divination: DivinationResult, 
   userQuestion: string,
   provider: AIProvider,
-  apiKey: string
+  config: { apiKey: string; customConfig?: CustomAIConfig }
 ): Promise<string> => {
-  if (!apiKey) {
-    return `请先配置 ${provider === 'gemini' ? 'Google Gemini' : 'DeepSeek'} 的 API Key`;
-  }
-
   const prompt = buildPrompt(divination, userQuestion);
 
   try {
     if (provider === 'gemini') {
-      return await callGemini(apiKey, prompt);
-    } else {
-      return await callDeepSeek(apiKey, prompt);
+      if (!config.apiKey) return "请先配置 Gemini API Key";
+      return await callGemini(config.apiKey, prompt);
+    } else if (provider === 'deepseek') {
+      if (!config.apiKey) return "请先配置 DeepSeek API Key";
+      return await callDeepSeek(config.apiKey, prompt);
+    } else if (provider === 'custom') {
+      if (!config.customConfig?.apiKey || !config.customConfig?.baseUrl) return "请先完善自定义模型配置";
+      return await callCustomOpenAI(config.customConfig, prompt);
     }
+    return "未知模型";
   } catch (error: any) {
     return `解读过程中遇到阻碍：${error.message || '未知错误'}`;
   }
