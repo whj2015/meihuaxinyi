@@ -5,21 +5,30 @@ import { HexagramData, TrigramData } from '../types';
 interface Props {
   hexagram: HexagramData;
   label: string;
-  highlight?: 'upper' | 'lower'; // Which part to highlight visually
+  highlight?: 'upper' | 'lower'; // Highlight indicates the 'Ti' (Body) gua
   movingLine?: number; // 1-6, to show indicator
 }
 
 const TrigramLines: React.FC<{ 
   trigram: TrigramData; 
   position: 'upper' | 'lower';
-  isHighlight: boolean;
+  isHighlight: boolean; // True if this is Ti (Body)
+  hasRoleContext: boolean; // True if we should show Ti/Yong labels
   movingLineIndex?: number; // 1,2,3 relative to trigram
-}> = ({ trigram, position, isHighlight, movingLineIndex }) => {
+}> = ({ trigram, position, isHighlight, hasRoleContext, movingLineIndex }) => {
   
   const lines = trigram.binary.split(''); // ['1', '1', '0'] -> [Bottom, Mid, Top]
 
   return (
-    <div className={`flex flex-col-reverse gap-1.5 p-2 rounded-lg transition-colors ${isHighlight ? 'bg-amber-50/60 border border-amber-200/50' : 'bg-transparent border border-transparent'}`}>
+    <div className={`relative flex flex-col-reverse gap-1.5 p-2 rounded-lg transition-colors ${isHighlight ? 'bg-amber-50/60 border border-amber-200/50' : 'bg-transparent border border-transparent'}`}>
+      
+      {/* Ti/Yong Badge */}
+      {hasRoleContext && (
+        <div className={`absolute -right-6 top-1/2 -translate-y-1/2 text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border ${isHighlight ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-slate-400 border-slate-200'}`}>
+          {isHighlight ? '体' : '用'}
+        </div>
+      )}
+
       {lines.map((bit, idx) => {
         const currentLineNumRelative = idx + 1;
         const isMoving = movingLineIndex === currentLineNumRelative;
@@ -50,17 +59,24 @@ const HexagramVisual: React.FC<Props> = ({ hexagram, label, highlight, movingLin
 
   return (
     <div className="flex flex-col items-center">
-        <span className="text-xs font-serif text-slate-400 mb-2 tracking-widest">{label}</span>
-        <div className="flex flex-col gap-1 border border-slate-200 p-2 bg-white shadow-sm rounded-xl">
+        <span className="text-xs font-serif text-slate-400 mb-1 tracking-widest">{label}</span>
+        
+        {/* Sequence Badge */}
+        <div className="mb-2 px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] font-mono">
+            第 {hexagram.sequence} 卦
+        </div>
+
+        <div className="flex flex-col gap-1 border border-slate-200 p-2 bg-white shadow-sm rounded-xl relative">
             {/* Upper Trigram */}
             <div className="relative">
                 <TrigramLines 
                     trigram={hexagram.upper} 
                     position="upper" 
                     isHighlight={highlight === 'upper'} 
+                    hasRoleContext={!!highlight}
                     movingLineIndex={movingLineUpper}
                 />
-                 <span className="absolute -left-4 top-1/2 -translate-y-1/2 text-[10px] text-slate-300 font-serif writing-vertical-lr pointer-events-none select-none">
+                 <span className="absolute -left-5 md:-left-8 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-serif w-full text-right pr-2">
                     {hexagram.upper.name}
                 </span>
             </div>
@@ -71,9 +87,10 @@ const HexagramVisual: React.FC<Props> = ({ hexagram, label, highlight, movingLin
                     trigram={hexagram.lower} 
                     position="lower" 
                     isHighlight={highlight === 'lower'} 
+                    hasRoleContext={!!highlight}
                     movingLineIndex={movingLineLower}
                 />
-                <span className="absolute -left-4 top-1/2 -translate-y-1/2 text-[10px] text-slate-300 font-serif writing-vertical-lr pointer-events-none select-none">
+                <span className="absolute -left-5 md:-left-8 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-serif w-full text-right pr-2">
                     {hexagram.lower.name}
                 </span>
             </div>

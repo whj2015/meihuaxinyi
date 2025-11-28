@@ -4,7 +4,7 @@ import { calculateDivination } from '../utils/meiHuaLogic';
 import { DivinationResult, AIProvider, UserProfile, CustomAIConfig } from '../types';
 import HexagramVisual from './HexagramVisual';
 import { getInterpretation } from '../services/geminiService';
-import { Sparkles, ArrowRight, RefreshCcw, Settings, X, Check, User, LogOut, Gift, RotateCcw, Save, Loader2, Quote, BookOpen } from 'lucide-react';
+import { Sparkles, ArrowRight, RefreshCcw, Settings, X, Check, User, LogOut, Gift, RotateCcw, Save, Loader2, Quote, BookOpen, Activity } from 'lucide-react';
 
 // 升级版 Markdown 渲染器：支持标题、列表、段落
 const FormattedMarkdown: React.FC<{ text: string }> = ({ text }) => {
@@ -263,6 +263,22 @@ const DivinationTool: React.FC = () => {
   const isFreeTierAvailable = user.isLoggedIn && remainingFree > 0 && provider !== 'custom';
   const shouldShowSettingsDot = !user.isLoggedIn || (user.isLoggedIn && remainingFree > 0);
 
+  const getScoreColor = (score: string) => {
+      if (score.includes('Great Auspicious') || score.includes('大吉')) return 'bg-red-100 text-red-800 border-red-200';
+      if (score.includes('Auspicious') || score.includes('小吉')) return 'bg-amber-100 text-amber-800 border-amber-200';
+      if (score.includes('Great Bad') || score.includes('大凶')) return 'bg-slate-800 text-white border-slate-900';
+      return 'bg-slate-100 text-slate-600 border-slate-200';
+  };
+  
+  const getScoreLabel = (score: string) => {
+      if (score.includes('Great Auspicious')) return '大吉';
+      if (score === 'Auspicious') return '吉';
+      if (score.includes('Minor Auspicious')) return '小吉';
+      if (score.includes('Great Bad')) return '大凶';
+      if (score.includes('Minor Bad')) return '小凶';
+      return '平';
+  };
+
   return (
     <div className="max-w-3xl mx-auto space-y-5 pb-24 relative px-2 md:px-0">
       
@@ -422,7 +438,26 @@ const DivinationTool: React.FC = () => {
                 <HexagramVisual hexagram={result.changedHexagram} label="变卦"/>
             </div>
 
-            {/* Ancient Text Diagnosis Card (NEW) */}
+            {/* Core Conclusion Card (New) */}
+            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 relative overflow-hidden">
+                 <div className="absolute top-0 right-0 p-2 opacity-5">
+                    <Activity size={100} />
+                 </div>
+                 <div className="flex items-center gap-4 z-10">
+                     <div className="w-12 h-12 rounded-2xl bg-slate-800 text-white flex items-center justify-center font-serif font-bold text-xl shadow-lg shadow-slate-200">
+                        断
+                     </div>
+                     <div>
+                         <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">五行体用分析</div>
+                         <div className="text-lg font-bold text-slate-800 font-serif">{result.relation}</div>
+                     </div>
+                 </div>
+                 <div className={`px-5 py-2 rounded-xl text-sm font-bold border z-10 ${getScoreColor(result.relationScore)} shadow-sm`}>
+                     {getScoreLabel(result.relationScore)}
+                 </div>
+            </div>
+
+            {/* Ancient Text Diagnosis Card */}
             <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
                 <h3 className="font-serif font-bold text-slate-800 mb-4 flex items-center gap-2 pb-2 border-b border-slate-50">
                     <BookOpen size={18} className="text-amber-600"/> 
