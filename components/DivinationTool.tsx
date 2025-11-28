@@ -4,46 +4,39 @@ import { calculateDivination } from '../utils/meiHuaLogic';
 import { DivinationResult, AIProvider, UserProfile, CustomAIConfig } from '../types';
 import HexagramVisual from './HexagramVisual';
 import { getInterpretation } from '../services/geminiService';
-import { Sparkles, ArrowRight, RefreshCcw, Settings, X, Check, User, LogOut, Gift, RotateCcw, Save, Loader2, Quote, BookOpen, Activity, UserCircle, Briefcase } from 'lucide-react';
+import { Sparkles, ArrowRight, RefreshCcw, Settings, X, Check, User, LogOut, Gift, RotateCcw, Save, Loader2, Quote, BookOpen, Activity, UserCircle, Briefcase, GitCommit, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, MoveHorizontal } from 'lucide-react';
 
-// 升级版 Markdown 渲染器：支持标题、列表、段落
+// --- Markdown Renderer ---
 const FormattedMarkdown: React.FC<{ text: string }> = ({ text }) => {
   if (!text) return null;
-
   const lines = text.split('\n');
-  
   return (
-    <div className="space-y-3 font-serif text-slate-700">
+    <div className="space-y-4 font-serif text-slate-700">
       {lines.map((line, idx) => {
         const trimmed = line.trim();
-        if (!trimmed) return <div key={idx} className="h-1"></div>;
-
-        // 标题 (### 或 【】)
+        if (!trimmed) return <div key={idx} className="h-0"></div>;
         if (trimmed.startsWith('###') || trimmed.startsWith('【')) {
             const content = trimmed.replace(/^###\s*/, '').replace(/[【】]/g, '');
             return (
-                <h4 key={idx} className="text-base md:text-lg font-bold text-amber-800 mt-4 mb-2 flex items-center gap-2 border-l-4 border-amber-500 pl-3 bg-amber-50/50 py-1 rounded-r-lg">
+                <h4 key={idx} className="text-base md:text-lg font-bold text-slate-800 mt-6 mb-2 flex items-center gap-2">
+                    <span className="w-1 h-4 bg-amber-500 rounded-full"></span>
                     {content}
                 </h4>
             );
         }
-
-        // 列表项 (- 或 *)
         if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
             const content = trimmed.substring(2);
             return (
-                <div key={idx} className="flex gap-2 ml-1 md:ml-2">
-                    <span className="text-amber-500 mt-1.5">•</span>
-                    <p className="flex-1 leading-relaxed">
+                <div key={idx} className="flex gap-3 ml-1">
+                    <span className="text-amber-400 mt-2 text-[10px]">•</span>
+                    <p className="flex-1 leading-relaxed text-sm md:text-base text-slate-600">
                         <InlineBold text={content} />
                     </p>
                 </div>
             );
         }
-
-        // 普通段落
         return (
-            <p key={idx} className="leading-7 text-justify text-sm md:text-base">
+            <p key={idx} className="leading-7 md:leading-8 text-justify text-sm md:text-base text-slate-600">
                 <InlineBold text={trimmed} />
             </p>
         );
@@ -52,14 +45,13 @@ const FormattedMarkdown: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
-// 辅助组件：处理行内加粗
 const InlineBold: React.FC<{ text: string }> = ({ text }) => {
     const parts = text.split(/(\*\*.*?\*\*)/g);
     return (
         <>
             {parts.map((part, index) => {
                 if (part.startsWith('**') && part.endsWith('**')) {
-                    return <strong key={index} className="text-slate-900 font-bold bg-amber-100/50 px-0.5 rounded">{part.slice(2, -2)}</strong>;
+                    return <strong key={index} className="text-slate-900 font-bold bg-amber-50 px-1 rounded mx-0.5 border-b border-amber-100">{part.slice(2, -2)}</strong>;
                 }
                 return <span key={index}>{part}</span>;
             })}
@@ -67,6 +59,7 @@ const InlineBold: React.FC<{ text: string }> = ({ text }) => {
     );
 };
 
+// --- Main Component ---
 const DivinationTool: React.FC = () => {
   const [inputs, setInputs] = useState<string[]>(['', '', '']);
   const [question, setQuestion] = useState('');
@@ -75,10 +68,8 @@ const DivinationTool: React.FC = () => {
   const [aiInterpretation, setAiInterpretation] = useState<string | null>(null);
 
   const [showSettings, setShowSettings] = useState(false);
-  // Default provider is deepseek
-  const [provider, setProvider] = useState<AIProvider>('deepseek');
+  const [provider, setProvider] = useState<AIProvider>('deepseek'); // Default DeepSeek
   
-  // Local Keys (Guest Only)
   const [guestApiKeys, setGuestApiKeys] = useState({ gemini: '', deepseek: '' });
   const [customConfig, setCustomConfig] = useState<CustomAIConfig>({ apiKey: '', baseUrl: '', modelName: '' });
 
@@ -98,6 +89,8 @@ const DivinationTool: React.FC = () => {
     const savedProvider = localStorage.getItem('ai_provider') as AIProvider;
     if (savedProvider) {
         setProvider(savedProvider);
+    } else {
+        setProvider('deepseek'); 
     }
     const savedCustomConfig = localStorage.getItem('custom_ai_config');
     if (savedCustomConfig) {
@@ -171,7 +164,6 @@ const DivinationTool: React.FC = () => {
     if (user.isLoggedIn && provider !== 'custom') {
         setIsSavingKeys(true);
         try {
-            // Key is sent via Header, encoded to prevent body logging
             const encodeKey = (k: string) => k ? btoa(encodeURIComponent(k)) : "";
             
             const response = await fetch('/api/update-keys', {
@@ -184,7 +176,6 @@ const DivinationTool: React.FC = () => {
                 body: JSON.stringify({
                     username: user.username,
                     password: authForm.password,
-                    // keys are in headers
                 })
             });
             const data = await response.json();
@@ -246,7 +237,7 @@ const DivinationTool: React.FC = () => {
      const res = calculateDivination(nums[0], nums[1], nums[2]);
      setResult(res);
      setAiInterpretation(null);
-     setTimeout(() => document.getElementById('result-section')?.scrollIntoView({behavior:'smooth'}), 100);
+     setTimeout(() => document.getElementById('result-start')?.scrollIntoView({behavior:'smooth'}), 100);
   };
   
   const handleRandom = () => {
@@ -261,13 +252,14 @@ const DivinationTool: React.FC = () => {
 
   const remainingFree = 5 - (user.usageCount || 0);
   const isFreeTierAvailable = user.isLoggedIn && remainingFree > 0 && provider !== 'custom';
-  const shouldShowSettingsDot = !user.isLoggedIn || (user.isLoggedIn && remainingFree > 0);
+  // Subtle indicator: Show only if NOT logged in, or logged in and using free tier.
+  const shouldShowSettingsDot = !user.isLoggedIn; 
 
   const getScoreColor = (score: string) => {
-      if (score.includes('Great Auspicious') || score.includes('大吉')) return 'bg-red-100 text-red-800 border-red-200';
-      if (score.includes('Auspicious') || score.includes('小吉')) return 'bg-amber-100 text-amber-800 border-amber-200';
-      if (score.includes('Great Bad') || score.includes('大凶')) return 'bg-slate-800 text-white border-slate-900';
-      return 'bg-slate-100 text-slate-600 border-slate-200';
+      if (score.includes('Great Auspicious') || score.includes('大吉')) return 'text-red-600 bg-red-50 border-red-100';
+      if (score.includes('Auspicious') || score.includes('小吉')) return 'text-amber-600 bg-amber-50 border-amber-100';
+      if (score.includes('Great Bad') || score.includes('大凶')) return 'text-slate-600 bg-slate-100 border-slate-200';
+      return 'text-slate-500 bg-slate-50 border-slate-100';
   };
   
   const getScoreLabel = (score: string) => {
@@ -279,98 +271,125 @@ const DivinationTool: React.FC = () => {
       return '平';
   };
 
-  // Helper to extract Ti and Yong Trigrams
   const tiTrigram = result ? (result.tiGua === 'upper' ? result.originalHexagram.upper : result.originalHexagram.lower) : null;
   const yongTrigram = result ? (result.yongGua === 'upper' ? result.originalHexagram.upper : result.originalHexagram.lower) : null;
 
+  // Visual helper for relation arrow
+  const renderRelationVisual = () => {
+      if (!result) return null;
+      const { relation } = result;
+      
+      let arrow = <MoveHorizontal size={20} className="text-slate-300" />;
+      let desc = "比和 (平等)";
+
+      if (relation.includes("用生体")) {
+          arrow = <div className="flex flex-col items-center"><ArrowLeft size={20} className="text-red-500 animate-pulse"/><span className="text-[9px] text-red-500 font-bold mt-1">生</span></div>;
+          desc = "大吉：外界环境全力助你";
+      } else if (relation.includes("体生用")) {
+          arrow = <div className="flex flex-col items-center"><ArrowRight size={20} className="text-slate-400"/><span className="text-[9px] text-slate-400 font-bold mt-1">生</span></div>;
+          desc = "小凶：你在消耗精力付出";
+      } else if (relation.includes("体克用")) {
+          arrow = <div className="flex flex-col items-center"><ArrowRight size={20} className="text-amber-500"/><span className="text-[9px] text-amber-500 font-bold mt-1">克</span></div>;
+          desc = "小吉：努力克服就能掌控";
+      } else if (relation.includes("用克体")) {
+          arrow = <div className="flex flex-col items-center"><ArrowLeft size={20} className="text-slate-600"/><span className="text-[9px] text-slate-600 font-bold mt-1">克</span></div>;
+          desc = "大凶：外界压力巨大难扛";
+      } else if (relation.includes("比和")) {
+          arrow = <div className="flex flex-col items-center"><span className="text-xl font-bold text-amber-500">=</span><span className="text-[9px] text-amber-500 font-bold mt-1">同</span></div>;
+          desc = "大吉：同心协力顺水推舟";
+      }
+
+      return { arrow, desc };
+  };
+
+  const relationVisual = renderRelationVisual();
 
   return (
-    <div className="max-w-3xl mx-auto space-y-5 pb-24 relative px-2 md:px-0">
+    <div className="w-full space-y-8 relative">
       
       {/* Settings Modal */}
       {showSettings && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-end md:items-center justify-center p-0 md:p-4">
-          <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col animate-in slide-in-from-bottom-10 md:slide-in-from-bottom-0 duration-200">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-end md:items-center justify-center p-0 md:p-4">
+          <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col animate-in slide-in-from-bottom-10 md:slide-in-from-bottom-0 duration-200">
              <div className="md:hidden w-full flex justify-center pt-3 pb-1">
                 <div className="w-12 h-1.5 bg-slate-200 rounded-full"></div>
              </div>
-            <div className="px-5 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0 md:rounded-t-2xl">
-              <h3 className="font-serif font-bold text-slate-800 flex items-center gap-2">
-                <Settings size={18} className="text-slate-600" /> 
-                {user.isLoggedIn ? '云端同步' : '大师设置'}
-              </h3>
-              <button onClick={() => setShowSettings(false)} className="text-slate-400 p-2"><X size={20} /></button>
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white shrink-0 md:rounded-t-2xl">
+              <h3 className="font-serif font-bold text-slate-800 text-lg">设置与同步</h3>
+              <button onClick={() => setShowSettings(false)} className="text-slate-400 p-2 hover:bg-slate-50 rounded-full"><X size={20} /></button>
             </div>
             
-            <div className="overflow-y-auto no-scrollbar flex-1 overscroll-contain">
-                <div className="p-5 bg-slate-50 border-b border-slate-100">
+            <div className="overflow-y-auto no-scrollbar flex-1 overscroll-contain bg-slate-50/50">
+                <div className="p-6 bg-white m-4 rounded-xl shadow-sm border border-slate-100">
                     {!user.isLoggedIn ? (
                         <div className="space-y-4">
-                            <div className="flex items-center justify-between mb-1">
-                                <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2"><User size={16} /> 账号服务</h4>
-                                <div className="flex bg-slate-200 p-0.5 rounded-lg">
-                                    <button onClick={()=>setAuthMode('login')} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${authMode==='login'?'bg-white text-slate-800 shadow-sm':'text-slate-500'}`}>登录</button>
-                                    <button onClick={()=>setAuthMode('register')} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${authMode==='register'?'bg-white text-slate-800 shadow-sm':'text-slate-500'}`}>注册</button>
+                            <div className="flex items-center justify-between mb-2">
+                                <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2"><User size={16} /> 账号登录</h4>
+                                <div className="flex bg-slate-100 p-1 rounded-lg">
+                                    <button onClick={()=>setAuthMode('login')} className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${authMode==='login'?'bg-white text-slate-900 shadow-sm':'text-slate-400'}`}>登录</button>
+                                    <button onClick={()=>setAuthMode('register')} className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${authMode==='register'?'bg-white text-slate-900 shadow-sm':'text-slate-400'}`}>注册</button>
                                 </div>
                             </div>
-                            <div className="flex flex-col gap-2">
-                                <input type="text" placeholder="用户名" value={authForm.username} onChange={e=>setAuthForm({...authForm,username:e.target.value})} className="p-3 text-sm border border-slate-200 rounded-xl outline-none focus:border-amber-400"/>
-                                <input type="password" placeholder="密码" value={authForm.password} onChange={e=>setAuthForm({...authForm,password:e.target.value})} className="p-3 text-sm border border-slate-200 rounded-xl outline-none focus:border-amber-400"/>
+                            <div className="space-y-3">
+                                <input type="text" placeholder="用户名" value={authForm.username} onChange={e=>setAuthForm({...authForm,username:e.target.value})} className="w-full p-3 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400 transition-all"/>
+                                <input type="password" placeholder="密码" value={authForm.password} onChange={e=>setAuthForm({...authForm,password:e.target.value})} className="w-full p-3 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400 transition-all"/>
                             </div>
-                            <button onClick={handleAuth} disabled={isAuthProcessing} className="w-full py-2.5 bg-white border border-slate-300 text-slate-700 text-sm font-bold rounded-xl shadow-sm hover:bg-slate-50">
-                                {isAuthProcessing?<Loader2 size={16} className="animate-spin mx-auto"/>:(authMode==='login'?'登录':'注册并登录')}
+                            <button onClick={handleAuth} disabled={isAuthProcessing} className="w-full py-3 bg-slate-900 text-white text-sm font-bold rounded-xl shadow-lg shadow-slate-200 hover:bg-slate-800 active:scale-[0.98] transition-all">
+                                {isAuthProcessing?<Loader2 size={16} className="animate-spin mx-auto"/>:(authMode==='login'?'立即登录':'注册并登录')}
                             </button>
-                            <p className="text-[10px] text-amber-600 flex items-center gap-1 justify-center"><Gift size={12}/> 注册即送 5 次 AI 大师解卦</p>
+                            <div className="bg-amber-50 text-amber-800 text-xs p-3 rounded-lg flex items-center gap-2 border border-amber-100">
+                                <Gift size={14}/> 注册登录即可免费获赠 5 次大师解卦
+                            </div>
                         </div>
                     ) : (
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center text-amber-800 font-bold border-2 border-white shadow-sm">{user.username.charAt(0).toUpperCase()}</div>
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-slate-900 text-white rounded-full flex items-center justify-center font-bold text-xl shadow-md">{user.username.charAt(0).toUpperCase()}</div>
                                 <div>
-                                    <p className="font-bold text-slate-800 text-sm">{user.username}</p>
-                                    {remainingFree > 0 ? (
-                                        <p className="text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded mt-0.5">剩余免费: {remainingFree}次</p>
-                                    ) : (
-                                        <p className="text-[10px] text-slate-400 mt-0.5">免费额度已用完</p>
-                                    )}
+                                    <p className="font-bold text-slate-900">{user.username}</p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${remainingFree>0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+                                            免费额度: {remainingFree}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
-                            <button onClick={handleLogout} className="text-xs border px-3 py-1.5 rounded-lg bg-white shadow-sm hover:bg-red-50 hover:text-red-600 flex items-center gap-1"><LogOut size={12}/> 退出</button>
+                            <button onClick={handleLogout} className="text-xs border border-slate-200 px-3 py-2 rounded-lg bg-white hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-colors flex items-center gap-2 font-medium"><LogOut size={14}/> 退出</button>
                         </div>
                     )}
                 </div>
 
-                <div className="p-5 space-y-5">
+                <div className="p-6 m-4 mt-0 bg-white rounded-xl shadow-sm border border-slate-100 space-y-6">
                     <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-2">AI 模型</label>
-                        <div className="grid grid-cols-3 gap-2">
+                        <label className="block text-sm font-bold text-slate-800 mb-3">选择 AI 模型</label>
+                        <div className="grid grid-cols-3 gap-3">
                              {['deepseek', 'gemini', 'custom'].map(m => (
-                                 <button key={m} onClick={()=>setProvider(m as any)} className={`py-2.5 px-1 rounded-xl border font-bold text-xs relative ${provider===m?'bg-amber-50 border-amber-500 text-amber-900':'border-slate-200 text-slate-500'}`}>
-                                     {m.charAt(0).toUpperCase() + m.slice(1)}
-                                     {provider===m && <div className="absolute top-1 right-1 text-amber-600"><Check size={10}/></div>}
+                                 <button key={m} onClick={()=>setProvider(m as any)} className={`py-3 px-2 rounded-xl border text-xs font-bold relative transition-all ${provider===m?'bg-slate-900 border-slate-900 text-white shadow-md':'border-slate-200 text-slate-500 hover:border-slate-300 bg-white'}`}>
+                                     {m === 'deepseek' ? 'DeepSeek' : (m === 'gemini' ? 'Gemini' : '自定义')}
+                                     {provider===m && <div className="absolute -top-2 -right-2 bg-amber-500 text-white rounded-full p-0.5 border-2 border-white"><Check size={10}/></div>}
                                  </button>
                              ))}
                         </div>
                     </div>
 
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                         {provider === 'gemini' && (
-                            <div>
-                                <label className="block text-xs font-medium text-slate-500 mb-1.5">Gemini Key</label>
-                                <input type="password" value={guestApiKeys.gemini} onChange={e=>setGuestApiKeys({...guestApiKeys, gemini:e.target.value})} placeholder={user.isLoggedIn ? "留空则自动调用账户配置" : "输入 Key"} className="w-full p-3 text-sm rounded-xl border border-slate-200 outline-none focus:border-amber-500"/>
+                            <div className="animate-in fade-in slide-in-from-top-2">
+                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Gemini API Key</label>
+                                <input type="password" value={guestApiKeys.gemini} onChange={e=>setGuestApiKeys({...guestApiKeys, gemini:e.target.value})} placeholder={user.isLoggedIn ? "已登录，留空自动使用云端配置" : "请输入您的 Key"} className="w-full p-3 text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-amber-100 focus:border-amber-400 outline-none transition-all"/>
                             </div>
                         )}
                         {provider === 'deepseek' && (
-                            <div>
-                                <label className="block text-xs font-medium text-slate-500 mb-1.5">DeepSeek Key</label>
-                                <input type="password" value={guestApiKeys.deepseek} onChange={e=>setGuestApiKeys({...guestApiKeys, deepseek:e.target.value})} placeholder={user.isLoggedIn ? "留空则自动调用账户配置" : "输入 sk-..."} className="w-full p-3 text-sm rounded-xl border border-slate-200 outline-none focus:border-amber-500"/>
+                            <div className="animate-in fade-in slide-in-from-top-2">
+                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">DeepSeek API Key</label>
+                                <input type="password" value={guestApiKeys.deepseek} onChange={e=>setGuestApiKeys({...guestApiKeys, deepseek:e.target.value})} placeholder={user.isLoggedIn ? "已登录，留空自动使用云端配置" : "请输入 sk-..."} className="w-full p-3 text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-amber-100 focus:border-amber-400 outline-none transition-all"/>
                             </div>
                         )}
                         {provider === 'custom' && (
-                            <div className="space-y-2">
-                                <input type="text" value={customConfig.baseUrl} onChange={e=>setCustomConfig({...customConfig,baseUrl:e.target.value})} placeholder="Base URL" className="w-full p-3 text-sm border border-slate-200 rounded-xl"/>
-                                <input type="text" value={customConfig.modelName} onChange={e=>setCustomConfig({...customConfig,modelName:e.target.value})} placeholder="Model Name" className="w-full p-3 text-sm border border-slate-200 rounded-xl"/>
-                                <input type="password" value={customConfig.apiKey} onChange={e=>setCustomConfig({...customConfig,apiKey:e.target.value})} placeholder="API Key" className="w-full p-3 text-sm border border-slate-200 rounded-xl"/>
+                            <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                                <input type="text" value={customConfig.baseUrl} onChange={e=>setCustomConfig({...customConfig,baseUrl:e.target.value})} placeholder="API Base URL (e.g. https://api.openai.com/v1)" className="w-full p-3 text-sm border border-slate-200 rounded-xl bg-slate-50"/>
+                                <input type="text" value={customConfig.modelName} onChange={e=>setCustomConfig({...customConfig,modelName:e.target.value})} placeholder="Model Name (e.g. gpt-4)" className="w-full p-3 text-sm border border-slate-200 rounded-xl bg-slate-50"/>
+                                <input type="password" value={customConfig.apiKey} onChange={e=>setCustomConfig({...customConfig,apiKey:e.target.value})} placeholder="API Key" className="w-full p-3 text-sm border border-slate-200 rounded-xl bg-slate-50"/>
                             </div>
                         )}
                     </div>
@@ -378,197 +397,240 @@ const DivinationTool: React.FC = () => {
             </div>
 
             <div className="p-4 border-t border-slate-100 bg-white shrink-0 md:rounded-b-2xl">
-                <button onClick={saveSettings} disabled={isSavingKeys} className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform">
-                    {isSavingKeys ? <Loader2 className="animate-spin" size={18}/> : <Save size={18}/>} 
-                    {user.isLoggedIn && provider !== 'custom' ? '保存并同步' : '保存本地设置'}
+                <button onClick={saveSettings} disabled={isSavingKeys} className="w-full py-3.5 bg-slate-900 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg hover:bg-slate-800 active:scale-95 transition-all">
+                    {isSavingKeys ? <Loader2 className="animate-spin" size={20}/> : <Save size={20}/>} 
+                    {user.isLoggedIn && provider !== 'custom' ? '保存并同步至云端' : '保存设置 (本地)'}
                 </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Main UI */}
-      <div className="bg-white p-5 md:p-8 rounded-3xl shadow-sm border border-slate-100 relative overflow-hidden">
+      {/* Main Input Card */}
+      <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100/60 p-6 md:p-10 relative overflow-hidden transition-all hover:shadow-md">
+         {/* Background Decoration */}
+         <div className="absolute top-0 right-0 w-32 h-32 bg-amber-50 rounded-full blur-3xl -z-10 opacity-60"></div>
+
         {/* Top Bar */}
-        <div className="flex justify-between items-start mb-6">
-            <h2 className="text-xl font-serif font-bold text-slate-800 flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center"><Sparkles size={16} className="text-amber-600"/></div>
+        <div className="flex justify-between items-center mb-8 md:mb-10">
+            <h2 className="text-2xl font-serif font-bold text-slate-900 flex items-center gap-3">
                 数字起卦
             </h2>
-            <button onClick={()=>setShowSettings(true)} className="text-slate-400 hover:text-slate-700 p-2 rounded-full hover:bg-slate-50 relative group">
-               <Settings size={22}/>
+            <button onClick={()=>setShowSettings(true)} className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-full transition-all relative">
+               <Settings size={20}/>
                {shouldShowSettingsDot && (
-                   <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+                   <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-amber-500 rounded-full border-2 border-white"></span>
                )}
             </button>
         </div>
 
-        {/* Question Input */}
-        <div className="mb-6">
-            <input type="text" value={question} onChange={e=>setQuestion(e.target.value)} placeholder="所问何事？(可留空)" className="w-full p-4 bg-slate-50/50 border-b border-slate-200 focus:border-amber-500 outline-none text-base md:text-lg transition-colors placeholder:text-slate-400"/>
-        </div>
+        {/* Inputs */}
+        <div className="space-y-6 md:space-y-8">
+            <div className="relative group">
+                <input type="text" value={question} onChange={e=>setQuestion(e.target.value)} placeholder=" " className="peer w-full py-3 bg-transparent border-b-2 border-slate-100 focus:border-slate-900 outline-none text-lg transition-colors z-10 relative"/>
+                <label className="absolute left-0 top-3 text-slate-400 text-lg transition-all peer-focus:-top-4 peer-focus:text-xs peer-focus:text-slate-500 peer-focus:font-bold peer-[&:not(:placeholder-shown)]:-top-4 peer-[&:not(:placeholder-shown)]:text-xs peer-[&:not(:placeholder-shown)]:text-slate-500 pointer-events-none">所问何事？(可选)</label>
+            </div>
 
-        {/* Number Inputs - Mobile Optimized */}
-        <div className="flex gap-2 md:gap-6 mb-6">
-            {inputs.map((val,idx)=>(
-                <div key={idx} className="flex-1">
-                    <input 
-                        type="number" 
-                        placeholder={(idx+1).toString()}
-                        value={val} 
-                        onChange={e=>handleInputChange(idx,e.target.value)} 
-                        className="w-full text-center text-2xl md:text-4xl font-serif h-16 md:h-24 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-amber-400 outline-none shadow-sm transition-all"
-                    />
-                </div>
-            ))}
-        </div>
+            <div className="flex gap-3 md:gap-6">
+                {inputs.map((val,idx)=>(
+                    <div key={idx} className="flex-1 relative group">
+                         <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-white px-2 text-[10px] text-slate-400 font-mono z-10">NO.{idx+1}</div>
+                        <input 
+                            type="number" 
+                            value={val} 
+                            onChange={e=>handleInputChange(idx,e.target.value)} 
+                            className="w-full text-center text-2xl md:text-3xl font-serif h-20 md:h-24 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:border-amber-400 focus:ring-4 focus:ring-amber-50 outline-none transition-all placeholder:text-slate-200"
+                            placeholder="0"
+                        />
+                    </div>
+                ))}
+            </div>
 
-        {/* Action Buttons */}
-        <div className="flex gap-3">
-            <button onClick={handleCalculate} className="flex-[2] bg-slate-900 text-white py-3.5 rounded-xl font-bold text-base md:text-lg shadow-lg active:scale-95 transition-all flex justify-center items-center gap-2">
-                起卦 <ArrowRight size={18}/>
-            </button>
-            <button onClick={handleRandom} className="flex-1 bg-white border border-slate-200 text-slate-500 py-3.5 rounded-xl font-bold active:bg-slate-50 active:scale-95 transition-all flex justify-center items-center">
-                <RefreshCcw size={20}/>
-            </button>
+            <div className="flex gap-4 pt-2">
+                <button onClick={handleRandom} className="w-16 h-14 md:h-16 flex items-center justify-center rounded-2xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 active:scale-95 transition-all" title="随机生成">
+                    <RefreshCcw size={22}/>
+                </button>
+                <button onClick={handleCalculate} className="flex-1 h-14 md:h-16 bg-slate-900 text-white rounded-2xl font-bold text-lg shadow-xl shadow-slate-200 hover:shadow-2xl hover:-translate-y-0.5 active:scale-[0.98] transition-all flex justify-center items-center gap-3">
+                    开始起卦 <ArrowRight size={20} className="opacity-80"/>
+                </button>
+            </div>
         </div>
       </div>
 
-      {result && tiTrigram && yongTrigram && (
-        <div id="result-section" className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 scroll-mt-24">
-            {/* Hexagram Cards */}
-            <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col md:flex-row items-center justify-around gap-6 md:gap-0">
-                <HexagramVisual hexagram={result.originalHexagram} label="本卦" highlight={result.tiGua} movingLine={result.movingLine}/>
-                <div className="rotate-90 md:rotate-0 text-slate-200"><ArrowRight size={24}/></div>
-                <HexagramVisual hexagram={result.changedHexagram} label="变卦"/>
-            </div>
+      {/* Result Section */}
+      {result && tiTrigram && yongTrigram && relationVisual && (
+        <div id="result-start" className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700 scroll-mt-28">
+            
+            {/* 1. Hexagram Visuals (Horizontal on PC, Vertical Stack on Mobile) */}
+            <div className="bg-white rounded-[2rem] p-6 md:p-10 shadow-sm border border-slate-100/60">
+                <div className="flex flex-col md:flex-row items-stretch justify-center gap-8 md:gap-12">
+                    
+                    {/* Item: Original */}
+                    <div className="flex-1 flex flex-col items-center group">
+                        <HexagramVisual hexagram={result.originalHexagram} label="本卦 · 初始" highlight={result.tiGua} movingLine={result.movingLine}/>
+                        <div className="mt-4 text-xs text-slate-400 font-mono group-hover:text-amber-600 transition-colors">Start</div>
+                    </div>
 
-            {/* Core Conclusion Card (Optimized Ti/Yong Analysis) */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden">
-                 <div className="absolute top-0 right-0 p-2 opacity-5">
-                    <Activity size={100} />
-                 </div>
-                 
-                 <div className="flex flex-col gap-4 relative z-10">
-                     <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-slate-800 text-white flex items-center justify-center font-serif font-bold text-lg shadow-lg shadow-slate-200">
-                                断
+                    {/* Arrow / Connector */}
+                    <div className="flex md:flex-col items-center justify-center opacity-30">
+                        <div className="h-px w-full md:w-px md:h-20 bg-slate-400"></div>
+                        <ChevronRight className="md:rotate-90 text-slate-400 -ml-1 md:ml-0 md:-mt-1" size={16}/>
+                    </div>
+
+                    {/* Item: Mutual */}
+                    <div className="flex-1 flex flex-col items-center group">
+                         <div className="relative">
+                            <HexagramVisual hexagram={result.huHexagram} label="互卦 · 过程"/>
+                            <div className="absolute -top-3 -right-3 w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center border border-white shadow-sm text-slate-300">
+                                <GitCommit size={14}/>
                             </div>
-                            <span className="font-serif font-bold text-slate-700">体用分析结论</span>
-                        </div>
-                         <div className={`px-4 py-1.5 rounded-lg text-sm font-bold border ${getScoreColor(result.relationScore)}`}>
-                             {getScoreLabel(result.relationScore)}
                          </div>
-                     </div>
-
-                     {/* Ti / Yong Detailed Analysis */}
-                     <div className="grid grid-cols-2 gap-3 text-sm">
-                         <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex flex-col items-center text-center">
-                             <div className="flex items-center gap-1 text-slate-400 text-xs mb-1">
-                                <UserCircle size={14}/>
-                                体卦 (代表自己)
-                             </div>
-                             <div className="font-serif font-bold text-slate-800 text-lg">
-                                 {tiTrigram.name} <span className="text-xs font-normal text-slate-500">({tiTrigram.element})</span>
-                             </div>
-                         </div>
-                         <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex flex-col items-center text-center">
-                             <div className="flex items-center gap-1 text-slate-400 text-xs mb-1">
-                                <Briefcase size={14}/>
-                                用卦 (代表事物)
-                             </div>
-                             <div className="font-serif font-bold text-slate-800 text-lg">
-                                 {yongTrigram.name} <span className="text-xs font-normal text-slate-500">({yongTrigram.element})</span>
-                             </div>
-                         </div>
-                     </div>
-                     
-                     <div className="bg-amber-50 rounded-xl p-3 text-center border border-amber-100">
-                         <p className="text-amber-900 font-bold font-serif">{result.relation}</p>
-                     </div>
-                 </div>
-            </div>
-
-            {/* Ancient Text Diagnosis Card */}
-            <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
-                <h3 className="font-serif font-bold text-slate-800 mb-4 flex items-center gap-2 pb-2 border-b border-slate-50">
-                    <BookOpen size={18} className="text-amber-600"/> 
-                    古籍断语
-                </h3>
-                <div className="space-y-4 text-sm font-serif leading-relaxed">
-                    {/* Original Hexagram Text */}
-                    <div>
-                        <div className="font-bold text-slate-800 mb-1 flex items-baseline gap-2">
-                             【本卦】{result.originalHexagram.name}
-                        </div>
-                        <div className="text-slate-600 bg-slate-50 p-2 rounded-lg">
-                            {result.originalHexagram.text?.guaci || "暂无卦辞"}
-                        </div>
+                         <div className="mt-4 text-xs text-slate-400 font-mono group-hover:text-amber-600 transition-colors">Process</div>
                     </div>
 
-                    {/* Moving Line (Highlight) */}
-                    <div className="bg-amber-50 p-3 rounded-xl border border-amber-100 text-amber-900 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-1 bg-amber-200 text-[9px] font-bold text-amber-800 rounded-bl-lg">动爻</div>
-                        <div className="font-bold mb-1">【关键变数】</div>
-                        <div className="text-base font-medium">{result.movingLineText || "无动爻"}</div>
-                        <div className="text-[10px] text-amber-700/60 mt-1.5 pt-1.5 border-t border-amber-200/50">
-                            此爻为事态变化之机，吉凶悔吝皆由此生。
-                        </div>
+                    {/* Arrow / Connector */}
+                    <div className="flex md:flex-col items-center justify-center opacity-30">
+                        <div className="h-px w-full md:w-px md:h-20 bg-slate-400"></div>
+                        <ChevronRight className="md:rotate-90 text-slate-400 -ml-1 md:ml-0 md:-mt-1" size={16}/>
                     </div>
 
-                    {/* Changed Hexagram Text */}
-                    <div>
-                         <div className="font-bold text-slate-800 mb-1 flex items-baseline gap-2">
-                             【变卦】{result.changedHexagram.name}
-                        </div>
-                        <div className="text-slate-600 bg-slate-50 p-2 rounded-lg">
-                            {result.changedHexagram.text?.guaci || "暂无卦辞"}
-                        </div>
-                         <div className="text-[10px] text-slate-400 mt-1 text-right">
-                            （代表事情的最终走向或结果）
-                        </div>
+                    {/* Item: Changed */}
+                    <div className="flex-1 flex flex-col items-center group">
+                        <HexagramVisual hexagram={result.changedHexagram} label="变卦 · 结果"/>
+                        <div className="mt-4 text-xs text-slate-400 font-mono group-hover:text-amber-600 transition-colors">End</div>
                     </div>
                 </div>
             </div>
 
-            {/* AI Analysis Card */}
-            <div className="bg-white p-5 md:p-8 rounded-3xl shadow-sm border-l-4 border-amber-500 overflow-hidden relative">
-                <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+            {/* 2. Core Conclusion Card */}
+            <div className="grid md:grid-cols-2 gap-4">
+                 <div className={`p-6 md:p-8 rounded-[2rem] border relative overflow-hidden flex flex-col justify-between min-h-[160px] ${getScoreColor(result.relationScore)}`}>
+                     <div className="relative z-10">
+                        <div className="text-xs font-bold uppercase tracking-wider opacity-60 mb-1">吉凶速断</div>
+                        <div className="text-3xl md:text-4xl font-serif font-bold">{getScoreLabel(result.relationScore)}</div>
+                        <div className="mt-2 font-medium opacity-80">{result.relation}</div>
+                     </div>
+                     <div className="absolute -bottom-4 -right-4 opacity-10 rotate-12">
+                         <Activity size={120} />
+                     </div>
+                 </div>
+
+                 <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col justify-center">
+                     <div className="flex items-center justify-between gap-4 h-full relative">
+                         {/* Ti (Left) */}
+                         <div className="flex-1 flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-50 border border-slate-100 relative">
+                             <span className="text-[10px] text-slate-400 mb-1 flex items-center gap-1 uppercase tracking-wider">自己 (体)</span>
+                             <span className="font-serif font-bold text-xl text-slate-800">{tiTrigram.name} <span className="text-sm font-normal text-slate-500">({tiTrigram.element})</span></span>
+                         </div>
+                         
+                         {/* Relation Arrow */}
+                         <div className="flex flex-col items-center gap-1 shrink-0 z-10">
+                            {relationVisual.arrow}
+                         </div>
+
+                         {/* Yong (Right) */}
+                         <div className="flex-1 flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-50 border border-slate-100 relative">
+                             <span className="text-[10px] text-slate-400 mb-1 flex items-center gap-1 uppercase tracking-wider">事物 (用)</span>
+                             <span className="font-serif font-bold text-xl text-slate-800">{yongTrigram.name} <span className="text-sm font-normal text-slate-500">({yongTrigram.element})</span></span>
+                         </div>
+                     </div>
+                     <div className="text-center mt-3 text-xs text-slate-500 font-medium">
+                        {relationVisual.desc}
+                     </div>
+                 </div>
+            </div>
+
+            {/* 3. Ancient Text */}
+            <div className="bg-white p-6 md:p-10 rounded-[2rem] shadow-sm border border-slate-100">
+                <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-50">
+                    <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400">
+                        <BookOpen size={20}/>
+                    </div>
+                    <h3 className="font-serif font-bold text-xl text-slate-800">古籍断语</h3>
+                </div>
+                
+                <div className="grid gap-6 md:grid-cols-3">
+                    <div className="space-y-2">
+                        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">本卦</div>
+                        <div className="font-serif font-bold text-lg text-slate-800">{result.originalHexagram.name}</div>
+                        <p className="text-sm text-slate-600 leading-relaxed text-justify bg-slate-50 p-3 rounded-xl">
+                            {result.originalHexagram.text?.guaci}
+                        </p>
+                    </div>
+
+                    <div className="space-y-2 relative">
+                        <div className="text-xs font-bold text-amber-500 uppercase tracking-wider flex items-center gap-1">
+                            <Sparkles size={12}/> 动爻 (关键)
+                        </div>
+                        <div className="font-serif font-bold text-lg text-amber-700">
+                            {result.movingLineText ? result.movingLineText.split('：')[0] : '无'}
+                        </div>
+                        <p className="text-sm text-amber-900 leading-relaxed text-justify bg-amber-50 p-3 rounded-xl border border-amber-100 shadow-sm">
+                            {result.movingLineText ? result.movingLineText.substring(result.movingLineText.indexOf('：')+1) : '无动爻变化，事态平稳。'}
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">变卦</div>
+                        <div className="font-serif font-bold text-lg text-slate-800">{result.changedHexagram.name}</div>
+                        <p className="text-sm text-slate-600 leading-relaxed text-justify bg-slate-50 p-3 rounded-xl">
+                            {result.changedHexagram.text?.guaci}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            {/* 4. AI Analysis */}
+            <div className="bg-[#fdfbf7] p-6 md:p-10 rounded-[2rem] shadow-sm border border-slate-200/60 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-amber-50 rounded-full blur-3xl -z-10 opacity-50 translate-x-1/3 -translate-y-1/3"></div>
+
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
+                            <Quote size={20}/>
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-serif font-bold text-slate-900">大师详解</h3>
+                            <p className="text-xs text-slate-400">AI Master Interpretation</p>
+                        </div>
+                    </div>
+                    
                     <div className="flex items-center gap-2">
-                        <Quote size={20} className="text-amber-500/50" />
-                        <h3 className="text-lg font-serif font-bold text-slate-800">大师详解</h3>
                         {isFreeTierAvailable && !aiInterpretation && (
-                             <span className="text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full font-medium">免费额度: {remainingFree}</span>
+                             <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-100 px-3 py-1 rounded-full">
+                                免费额度: {remainingFree}
+                             </span>
+                        )}
+                        {aiInterpretation && !loadingAI && (
+                            <button onClick={handleAskAI} className="p-2 text-slate-400 hover:text-slate-800 bg-white border border-slate-200 hover:border-slate-300 rounded-full transition-all shadow-sm">
+                                <RotateCcw size={18} />
+                            </button>
                         )}
                     </div>
-                    {/* Re-interpret Button */}
-                    {aiInterpretation && !loadingAI && (
-                        <button onClick={handleAskAI} className="text-slate-400 hover:text-amber-600 transition-colors p-1" title="再次解读">
-                            <RotateCcw size={18} />
-                        </button>
-                    )}
                 </div>
 
                 {!aiInterpretation ? (
-                    <div className="py-8">
-                        <p className="text-slate-400 text-center text-sm mb-6 px-4">
-                            融合《梅花易数》古法与现代 AI 智慧，为您提供详尽的运势分析。
+                    <div className="py-12 flex flex-col items-center justify-center text-center">
+                        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
+                            <Sparkles className="text-slate-300" size={32}/>
+                        </div>
+                        <p className="text-slate-500 max-w-sm mb-8 leading-relaxed">
+                            AI 国学大师将综合本卦、互卦与变卦，<br/>结合五行生克为您进行深度推演。
                         </p>
-                        <button onClick={handleAskAI} disabled={loadingAI} className="w-full py-4 bg-gradient-to-r from-amber-600 to-amber-700 text-white rounded-xl font-bold shadow-md active:scale-[0.98] transition-all flex justify-center items-center gap-2">
-                            {loadingAI ? '大师推演中...' : 'AI 大师解卦'} {loadingAI && <Loader2 className="animate-spin" size={18}/>}
+                        <button onClick={handleAskAI} disabled={loadingAI} className="px-8 py-3 bg-slate-900 text-white rounded-full font-bold shadow-lg hover:shadow-xl hover:-translate-y-1 active:scale-95 transition-all flex items-center gap-2">
+                            {loadingAI ? '大师正在推演...' : '请求大师解卦'} 
+                            {loadingAI ? <Loader2 className="animate-spin" size={18}/> : <ArrowRight size={18}/>}
                         </button>
                     </div>
                 ) : (
-                    <div className="bg-[#fdfbf7] p-4 md:p-6 rounded-2xl border border-slate-100 shadow-inner">
+                    <div className="prose prose-slate max-w-none">
                         <FormattedMarkdown text={aiInterpretation}/>
-                        <div className="h-4 w-1 bg-amber-500 animate-pulse inline-block ml-1 align-middle"></div>
-                        <div className="mt-8 pt-4 border-t border-slate-200/50 text-center">
-                            <p className="text-[10px] text-slate-300 font-serif">此结果仅供娱乐与参考，切勿迷信</p>
-                        </div>
+                        <div className="h-5 w-1.5 bg-amber-500 animate-pulse inline-block ml-1 align-middle rounded-full"></div>
                     </div>
                 )}
             </div>
+            
+            <div className="h-12"></div>
         </div>
       )}
     </div>

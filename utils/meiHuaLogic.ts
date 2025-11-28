@@ -24,6 +24,42 @@ const getHexagramSequence = (upperId: number, lowerId: number): number => {
 
 const invertBit = (bit: string): string => (bit === '1' ? '0' : '1');
 
+// Helper: Get Trigram by matching binary string
+const getTrigramByBinary = (binary: string): TrigramData => {
+    return Object.values(TRIGRAMS).find(t => t.binary === binary) || TRIGRAMS[1];
+};
+
+// Calculate Mutual Hexagram (Hu Gua)
+// 互卦：下卦(内互)由本卦2,3,4爻组成；上卦(外互)由本卦3,4,5爻组成。
+const getHuGua = (upper: TrigramData, lower: TrigramData): HexagramData => {
+    // Construct full 6-line binary string. 
+    // TrigramData.binary is stored Bottom->Top.
+    // e.g. Lower "101" means Line1=1, Line2=0, Line3=1
+    const lowerBits = lower.binary.split('');
+    const upperBits = upper.binary.split('');
+    
+    // Combined Lines: [L1, L2, L3, U1, U2, U3] -> Index 0,1,2,3,4,5
+    const allLines = [...lowerBits, ...upperBits];
+    
+    // Lower Hu (Inner): Lines 2,3,4 -> Indices 1,2,3
+    const lowerHuBinary = allLines[1] + allLines[2] + allLines[3];
+    const lowerHu = getTrigramByBinary(lowerHuBinary);
+    
+    // Upper Hu (Outer): Lines 3,4,5 -> Indices 2,3,4
+    const upperHuBinary = allLines[2] + allLines[3] + allLines[4];
+    const upperHu = getTrigramByBinary(upperHuBinary);
+    
+    const text = getIChingText(upperHu.id, lowerHu.id);
+    
+    return {
+        upper: upperHu,
+        lower: lowerHu,
+        name: getHexagramName(upperHu, lowerHu),
+        sequence: getHexagramSequence(upperHu.id, lowerHu.id),
+        text
+    };
+};
+
 // Function to change a trigram based on line change (1, 2, or 3 relative to trigram)
 const changeTrigram = (trigram: TrigramData, lineIndex: number): TrigramData => {
   // lineIndex 1 = bottom, 2 = middle, 3 = top
@@ -105,8 +141,11 @@ export const calculateDivination = (n1: number, n2: number, n3: number): Divinat
   const ichingText = getIChingText(upperOriginal.id, lowerOriginal.id);
   const movingLineText = ichingText ? ichingText.lines[movingLine] : undefined;
   
-  // Fetch Changed Hexagram Text (Newly Added)
+  // Fetch Changed Hexagram Text
   const changedHexText = getIChingText(upperChanged.id, lowerChanged.id);
+
+  // Calculate Hu Hexagram
+  const huHexagram = getHuGua(upperOriginal, lowerOriginal);
 
   return {
     inputNumbers: [n1, n2, n3],
@@ -117,12 +156,13 @@ export const calculateDivination = (n1: number, n2: number, n3: number): Divinat
       sequence: getHexagramSequence(upperOriginal.id, lowerOriginal.id),
       text: ichingText,
     },
+    huHexagram, // Include Mutual Hexagram
     changedHexagram: {
       upper: upperChanged,
       lower: lowerChanged,
       name: getHexagramName(upperChanged, lowerChanged),
       sequence: getHexagramSequence(upperChanged.id, lowerChanged.id),
-      text: changedHexText, // Inject text for changed hexagram
+      text: changedHexText,
     },
     movingLine,
     tiGua,

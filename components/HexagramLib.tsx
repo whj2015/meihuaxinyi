@@ -4,7 +4,7 @@ import { HEXAGRAM_SEQUENCE, HEXAGRAM_NAMES, TRIGRAMS } from '../constants';
 import { getIChingText } from '../utils/ichingData';
 import { HexagramData, TrigramData } from '../types';
 import HexagramVisual from './HexagramVisual';
-import { Search, X, ScrollText, ArrowRight } from 'lucide-react';
+import { Search, X, ScrollText, ArrowRight, MessageCircle } from 'lucide-react';
 
 // 轻量级卦画组件，仅用于列表展示，减少DOM开销
 const MiniHexagram: React.FC<{ upper: TrigramData; lower: TrigramData }> = ({ upper, lower }) => {
@@ -151,21 +151,35 @@ const HexagramLib: React.FC = () => {
                 {selectedHex.text ? (
                     <div className="space-y-6">
                         {/* Guaci */}
-                        <div className="relative pl-4 border-l-4 border-slate-800">
-                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">卦辞</h4>
-                            <p className="font-serif text-lg leading-relaxed text-slate-800">
-                                {selectedHex.text.guaci}
-                            </p>
+                        <div className="relative pl-4 border-l-4 border-slate-800 space-y-3">
+                            <div>
+                                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">卦辞</h4>
+                                <p className="font-serif text-lg leading-relaxed text-slate-800">
+                                    {selectedHex.text.guaci}
+                                </p>
+                            </div>
+                            {/* Modern Explanation */}
+                            {selectedHex.text.guaci_explain && (
+                                <div className="bg-slate-100/80 p-3 rounded-lg text-sm text-slate-600 leading-relaxed font-sans">
+                                    <span className="font-bold text-slate-700 mr-2">【现代速解】</span>
+                                    {selectedHex.text.guaci_explain}
+                                </div>
+                            )}
                         </div>
 
                         {/* Xiang */}
-                        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-                             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-3">
+                             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-2">
                                 <ScrollText size={14}/> 大象传
                              </h4>
                              <p className="font-serif text-slate-700 leading-relaxed">
                                 {selectedHex.text.xiang}
                              </p>
+                             {selectedHex.text.xiang_explain && (
+                                <div className="pt-2 border-t border-slate-50 text-sm text-slate-500 font-sans">
+                                    {selectedHex.text.xiang_explain}
+                                </div>
+                             )}
                         </div>
 
                         {/* Lines (Yaoci) */}
@@ -173,14 +187,21 @@ const HexagramLib: React.FC = () => {
                              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 text-center">六爻爻辞</h4>
                              <div className="space-y-3">
                                 {[6, 5, 4, 3, 2, 1].map((lineNum) => (
-                                    <div key={lineNum} className="flex gap-4 p-3 hover:bg-white rounded-xl transition-colors border border-transparent hover:border-slate-100">
-                                        <div className="shrink-0 w-8 h-8 rounded-full bg-slate-100 text-slate-500 font-serif font-bold flex items-center justify-center text-sm">
-                                            {lineNum}
-                                        </div>
-                                        <div>
-                                            <p className="font-serif text-slate-700 leading-relaxed">
-                                                {selectedHex.text?.lines[lineNum]}
-                                            </p>
+                                    <div key={lineNum} className="group p-3 hover:bg-white rounded-xl transition-colors border border-transparent hover:border-slate-100">
+                                        <div className="flex gap-4">
+                                            <div className="shrink-0 w-8 h-8 rounded-full bg-slate-100 text-slate-500 font-serif font-bold flex items-center justify-center text-sm">
+                                                {lineNum}
+                                            </div>
+                                            <div className="flex-1 space-y-2">
+                                                <p className="font-serif text-slate-700 leading-relaxed font-medium">
+                                                    {selectedHex.text?.lines[lineNum]}
+                                                </p>
+                                                {selectedHex.text?.lines_explain?.[lineNum] && (
+                                                    <p className="text-sm text-slate-500 bg-slate-50 p-2 rounded-lg font-sans">
+                                                       {selectedHex.text.lines_explain[lineNum]}
+                                                    </p>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 ))}

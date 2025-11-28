@@ -28,8 +28,11 @@ export interface TrigramData {
 
 export interface IChingText {
   guaci: string; // 卦辞
+  guaci_explain?: string; // 卦辞白话注解
   xiang: string; // 大象
+  xiang_explain?: string; // 大象白话注解
   lines: Record<number, string>; // 爻辞 (1-6)
+  lines_explain?: Record<number, string>; // 爻辞白话注解 (1-6)
 }
 
 export interface HexagramData {
@@ -44,6 +47,7 @@ export interface HexagramData {
 export interface DivinationResult {
   inputNumbers: [number, number, number];
   originalHexagram: HexagramData;
+  huHexagram: HexagramData; // 新增：互卦 (过程)
   changedHexagram: HexagramData;
   movingLine: number; // 1-6
   tiGua: 'upper' | 'lower'; // Which part is Body

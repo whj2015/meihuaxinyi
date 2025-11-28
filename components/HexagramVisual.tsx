@@ -12,55 +12,61 @@ interface Props {
 const TrigramVisualRow: React.FC<{ 
   trigram: TrigramData; 
   position: 'upper' | 'lower';
-  isTi: boolean; // True if this is Ti (Body)
-  isYong: boolean; // True if this is Yong (Application)
-  hasRoleContext: boolean; // True if we should show Ti/Yong labels
-  movingLineIndex?: number; // 1,2,3 relative to trigram
+  isTi: boolean; 
+  isYong: boolean; 
+  hasRoleContext: boolean; 
+  movingLineIndex?: number; 
 }> = ({ trigram, position, isTi, isYong, hasRoleContext, movingLineIndex }) => {
   
   const lines = trigram.binary.split(''); // ['1', '1', '0'] -> [Bottom, Mid, Top]
 
   return (
-    <div className={`relative flex items-center justify-between gap-3 md:gap-4 p-2.5 rounded-xl transition-all ${isTi ? 'bg-amber-50 border border-amber-200/60 shadow-sm' : 'border border-transparent'}`}>
+    <div className="flex items-center w-full py-2 pl-2 pr-0">
       
-      {/* Left: The Trigram Character (Big) */}
-      <div className="flex flex-col items-center justify-center w-8 md:w-10 shrink-0">
-         <span className={`text-2xl md:text-3xl font-serif font-bold leading-none ${isTi ? 'text-slate-800' : 'text-slate-400'}`}>
+      {/* Left: The Lines & Watermark Container */}
+      <div className="relative flex-1 flex justify-center py-1">
+        
+        {/* Watermark Character (Background, centered on lines) */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-6xl font-serif text-slate-100 pointer-events-none select-none z-0 opacity-80">
             {trigram.name}
-         </span>
-         <span className="text-[10px] text-slate-400 mt-1 scale-90">{trigram.nature}·{trigram.element}</span>
+        </div>
+
+        {/* The Lines */}
+        <div className="flex flex-col-reverse gap-2 w-full max-w-[120px] z-10">
+          {lines.map((bit, idx) => {
+              const currentLineNumRelative = idx + 1;
+              const isMoving = movingLineIndex === currentLineNumRelative;
+
+              return (
+              <div key={idx} className="h-3.5 md:h-4 w-full flex justify-between relative group">
+                  {bit === '1' ? (
+                  <div className={`w-full h-full rounded-[1px] transition-colors duration-500 ${isMoving ? 'bg-amber-600' : 'bg-slate-800'}`}></div>
+                  ) : (
+                  <>
+                      <div className={`w-[44%] h-full rounded-[1px] transition-colors duration-500 ${isMoving ? 'bg-amber-600' : 'bg-slate-800'}`}></div>
+                      <div className={`w-[44%] h-full rounded-[1px] transition-colors duration-500 ${isMoving ? 'bg-amber-600' : 'bg-slate-800'}`}></div>
+                  </>
+                  )}
+                  
+                  {/* Moving Line Dot Indicator (Right of the line) */}
+                  {isMoving && (
+                      <div className="absolute -right-3 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-amber-600 rounded-full shadow-sm"></div>
+                  )}
+              </div>
+              );
+          })}
+        </div>
       </div>
 
-      {/* Middle: The Lines */}
-      <div className="flex flex-col-reverse gap-1.5 grow">
-        {lines.map((bit, idx) => {
-            const currentLineNumRelative = idx + 1;
-            const isMoving = movingLineIndex === currentLineNumRelative;
-
-            return (
-            <div key={idx} className="relative h-3.5 md:h-4 flex items-center justify-center w-full">
-                {bit === '1' ? (
-                <div className={`w-full h-full rounded-[2px] transition-colors ${isMoving ? 'bg-amber-600 shadow-sm ring-1 ring-amber-300' : 'bg-slate-700'}`}></div>
-                ) : (
-                <div className="w-full h-full flex justify-between">
-                    <div className={`w-[42%] h-full rounded-[2px] transition-colors ${isMoving ? 'bg-amber-600 shadow-sm ring-1 ring-amber-300' : 'bg-slate-700'}`}></div>
-                    <div className={`w-[42%] h-full rounded-[2px] transition-colors ${isMoving ? 'bg-amber-600 shadow-sm ring-1 ring-amber-300' : 'bg-slate-700'}`}></div>
-                </div>
-                )}
-            </div>
-            );
-        })}
-      </div>
-
-      {/* Right: The Ti/Yong Seal */}
-      <div className="w-8 md:w-10 shrink-0 flex items-center justify-center">
+      {/* Right: Dedicated Column for Ti/Yong Seal */}
+      <div className="w-12 flex justify-center shrink-0 z-20">
          {hasRoleContext && isTi && (
-             <div className="w-8 h-8 rounded-full border-2 border-red-700/80 text-red-700 bg-red-50 flex items-center justify-center font-serif font-bold text-sm shadow-sm rotate-12 opacity-90">
+             <div className="w-8 h-8 rounded-[4px] border border-red-700/60 text-red-700 bg-white/50 flex items-center justify-center font-serif font-bold text-sm shadow-sm rotate-12 backdrop-blur-sm" title="体卦：代表自己">
                  体
              </div>
          )}
          {hasRoleContext && isYong && (
-             <div className="w-8 h-8 rounded-full border-2 border-slate-300 text-slate-400 flex items-center justify-center font-serif font-bold text-sm -rotate-6 bg-slate-50">
+             <div className="w-8 h-8 rounded-[4px] border border-slate-300 text-slate-400 bg-white/50 flex items-center justify-center font-serif font-bold text-sm shadow-sm -rotate-6 backdrop-blur-sm" title="用卦：代表事物">
                  用
              </div>
          )}
@@ -70,21 +76,19 @@ const TrigramVisualRow: React.FC<{
 };
 
 const HexagramVisual: React.FC<Props> = ({ hexagram, label, highlight, movingLine }) => {
-  // Calculate relative moving line index
   const movingLineLower = (movingLine && movingLine <= 3) ? movingLine : undefined;
   const movingLineUpper = (movingLine && movingLine > 3) ? movingLine - 3 : undefined;
 
   return (
     <div className="flex flex-col items-center">
-        <span className="text-xs font-serif text-slate-400 mb-2 tracking-[0.2em]">{label}</span>
+        <span className="text-[10px] font-sans font-bold text-slate-400 mb-3 tracking-[0.2em] uppercase">{label}</span>
         
-        <div className="flex flex-col gap-2 w-48 md:w-56 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden">
-             {/* Sequence Badge (Top Left Corner) */}
-            <div className="absolute top-0 left-0 bg-slate-100 text-slate-400 text-[9px] px-2 py-0.5 rounded-br-lg font-mono z-10">
+        <div className="flex flex-col gap-1 w-44 md:w-52 p-3 rounded-2xl bg-white shadow-[0_2px_15px_-5px_rgba(0,0,0,0.05)] border border-slate-100/50 relative overflow-hidden">
+             {/* Sequence Badge */}
+            <div className="absolute top-2 left-2 bg-slate-50 text-slate-300 text-[9px] px-1.5 py-0.5 rounded border border-slate-100 font-mono z-30">
                 #{hexagram.sequence}
             </div>
 
-            {/* Upper Trigram */}
             <TrigramVisualRow 
                 trigram={hexagram.upper} 
                 position="upper" 
@@ -94,10 +98,8 @@ const HexagramVisual: React.FC<Props> = ({ hexagram, label, highlight, movingLin
                 movingLineIndex={movingLineUpper}
             />
 
-            {/* Divider */}
-            <div className="h-px bg-slate-100 w-full mx-auto"></div>
+            <div className="h-px bg-slate-100 w-1/2 mx-auto opacity-50 my-1"></div>
 
-            {/* Lower Trigram */}
             <TrigramVisualRow 
                 trigram={hexagram.lower} 
                 position="lower" 
@@ -108,14 +110,16 @@ const HexagramVisual: React.FC<Props> = ({ hexagram, label, highlight, movingLin
             />
         </div>
         
-        {/* Hexagram Name */}
-        <div className="mt-3 text-center">
-            <h3 className="text-lg font-bold font-serif text-slate-800 tracking-wide">{hexagram.name}</h3>
-            <div className="mt-1 text-[10px] text-slate-400 font-medium">
-                {/* Structure Info */}
-                <span className="mr-1">上{hexagram.upper.name}{hexagram.upper.element}</span>
-                <span className="text-slate-300">/</span>
-                <span className="ml-1">下{hexagram.lower.name}{hexagram.lower.element}</span>
+        {/* Hexagram Name & Info */}
+        <div className="mt-4 text-center">
+            <h3 className="text-xl font-bold font-serif text-slate-800 tracking-wide">{hexagram.name}</h3>
+            <div className="mt-2 flex flex-col gap-0.5">
+                <div className="text-[10px] text-slate-500 font-medium font-sans">
+                   上{hexagram.upper.name}{hexagram.upper.nature}<span className="text-slate-300 mx-1">/</span>五行属{hexagram.upper.element}
+                </div>
+                <div className="text-[10px] text-slate-500 font-medium font-sans">
+                   下{hexagram.lower.name}{hexagram.lower.nature}<span className="text-slate-300 mx-1">/</span>五行属{hexagram.lower.element}
+                </div>
             </div>
         </div>
     </div>

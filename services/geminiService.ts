@@ -2,48 +2,43 @@
 import { DivinationResult, AIProvider, CustomAIConfig } from "../types";
 
 /**
- * 构建提示词 (优化版：结构化输出)
+ * 构建提示词 (优化版：结构化输出 + 互卦分析 + 中立客观)
  */
 const buildPrompt = (divination: DivinationResult, userQuestion: string): string => {
-  const { originalHexagram, changedHexagram, relation, relationScore, tiGua, yongGua, inputNumbers, movingLineText } = divination;
-  const tiName = tiGua === 'upper' ? originalHexagram.upper.name : originalHexagram.lower.name;
-  const yongName = yongGua === 'upper' ? originalHexagram.upper.name : originalHexagram.lower.name;
-  const tiElement = tiGua === 'upper' ? originalHexagram.upper.element : originalHexagram.lower.element;
-  const yongElement = yongGua === 'upper' ? originalHexagram.upper.element : originalHexagram.lower.element;
-
-  const guaci = originalHexagram.text?.guaci || "暂无";
-  const xiang = originalHexagram.text?.xiang || "暂无";
-  const yaoci = movingLineText || "暂无";
-
+  const { originalHexagram, changedHexagram, huHexagram, relation, relationScore, tiGua, yongGua, movingLineText } = divination;
+  
   return `
-    你是一位精通《梅花易数》的国学大师，你的风格是：**直击要害、逻辑清晰、语气平和**。
-    请根据以下卦象数据，为求测者提供一份结构化的解读。
+    你是一位精通《梅花易数》的国学大师，你的解卦风格是：**中立客观、逻辑严密、不欺人、不媚俗**。
+    请根据以下卦象数据，为求测者提供一份真实、理性的解读。
 
-    【基本信息】
+    【核心数据】
     - 问事：${userQuestion || "综合运势"}
-    - 卦象：本卦【${originalHexagram.name}】之变卦【${changedHexagram.name}】
-    - 核心：${relation} (${relationScore})
+    - 卦象演变：本卦【${originalHexagram.name}】 -> 互卦【${huHexagram.name}】(过程) -> 变卦【${changedHexagram.name}】(结果)
+    - 核心关系：${relation} (${relationScore})
+    - 关键动爻：${movingLineText || "无"}
 
-    【解读要求】
-    请严格按照以下 Markdown 格式输出（不要使用代码块，直接输出文本）：
+    【解读原则】
+    1. **保持中立**：请务必基于五行生克和卦义实话实说。好就是好，坏就是坏。不要只报喜不报忧，也不要故意吓唬用户。
+    2. **重视过程**：请特别关注“互卦”，它揭示了事情内部的隐情、中间的波折或潜在的因果链条。
+    3. **拒绝迷信**：分析要结合现实逻辑，提供具有操作性的建议。
 
-    ### 🎯 核心结论
-    （用一句话直接断吉凶成败，不要模棱两可。）
+    【输出格式】
+    请严格按照以下 Markdown 格式输出（不要使用代码块）：
 
-    ### 📜 古义今解
-    （简要引用一句最关键的卦辞或爻辞，然后迅速用现代大白话解释其现实含义。不要大段掉书袋。）
+    ### 🎯 核心断语
+    （用一句话直断吉凶。例如：“此事先难后易，最终可成”或“目前时机未到，强求有悔”。）
+
+    ### 🔍 深度解析
+    - **现状（本卦）**：...
+    - **过程（互卦）**：基于【${huHexagram.name}】，分析事情发展的中间环节、潜在阻力或内部隐情。
+    - **结局（变卦）**：...
 
     ### 💡 关键转折
-    （基于动爻和变卦，说明事情会发生什么变化，是变好还是变坏。）
+    （基于动爻“${movingLineText}”进行分析，说明这一变数如何影响全局。）
 
-    ### 🚀 大师建议
-    - （建议1：具体行动）
-    - （建议2：心态调整）
-    
-    【注意事项】
-    1. 排版要美观，使用 **加粗** 标记重点。
-    2. 列表项请使用 "- " 开头。
-    3. 语气要像长者对晚辈的叮嘱，温暖而有力量。
+    ### 🚀 大师忠告
+    - （建议1：客观的行动指南）
+    - （建议2：心态或策略调整）
   `;
 };
 
@@ -137,7 +132,7 @@ export const getInterpretation = async (
   onStreamUpdate: (text: string) => void
 ): Promise<string> => {
   const prompt = buildPrompt(divination, userQuestion);
-  onStreamUpdate("大师正在连接云端...");
+  onStreamUpdate("大师正在连接云端，静候天机...");
 
   try {
     const payload: any = {
