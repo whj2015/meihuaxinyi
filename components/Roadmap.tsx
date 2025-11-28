@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, BookOpen, Compass, Award } from 'lucide-react';
+import { ChevronDown, ChevronUp, BookOpen, Compass, Award, Layers } from 'lucide-react';
 
 const RoadmapItem: React.FC<{ title: string; children: React.ReactNode; defaultOpen?: boolean }> = ({ title, children, defaultOpen = false }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -73,6 +73,19 @@ const Roadmap: React.FC = () => {
         </div>
 
         <div className="flex items-start gap-3 mt-6">
+          <Layers className="text-amber-600 mt-1 shrink-0" size={20} />
+          <div>
+             <h4 className="font-bold text-slate-800 mb-1">互卦：洞察隐情与过程</h4>
+             <p className="text-sm mb-2 text-slate-600">本卦代表开始，变卦代表结果，而互卦代表<strong>中间过程</strong>和内部隐情。</p>
+             <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-xs space-y-1">
+                <p><span className="font-bold text-slate-700">内互（下卦）</span>：取本卦的 2、3、4 爻。</p>
+                <p><span className="font-bold text-slate-700">外互（上卦）</span>：取本卦的 3、4、5 爻。</p>
+                <p className="text-slate-400 mt-1">组合起来即为互卦，揭示事物发展的内在逻辑。</p>
+             </div>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-3 mt-6">
           <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold shrink-0 mt-1">解</div>
           <div>
             <h4 className="font-bold text-slate-800 mb-1">五步解卦法</h4>
@@ -90,8 +103,8 @@ const Roadmap: React.FC = () => {
                     <p className="text-slate-500">不动为体（自己），动为用（事物）。看五行生克。</p>
                 </div>
                 <div>
-                    <span className="text-amber-600 font-bold">4. 观变卦</span>
-                    <p className="text-slate-500">推未来趋势。</p>
+                    <span className="text-amber-600 font-bold">4. 看互卦与变卦</span>
+                    <p className="text-slate-500">互卦看过程与隐情，变卦看最终趋势。</p>
                 </div>
                 <div>
                     <span className="text-amber-600 font-bold">5. 编故事</span>

@@ -6,7 +6,7 @@ import HexagramLib from './components/HexagramLib';
 import { BookOpen, Compass, Library } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'learn' | 'practice' | 'library'>('practice');
+  const [activeTab, setActiveTab] = useState<'learn' | 'practice' | 'library'>('learn');
 
   return (
     <div className="min-h-screen bg-[#fdfbf7] text-slate-800 font-sans selection:bg-amber-100">

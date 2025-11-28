@@ -78,3 +78,14 @@ export interface UserProfile {
   token?: string;
   usageCount?: number; // 已使用免费额度次数
 }
+
+export interface HistoryRecord {
+  id: number | string; // Guest uses string/timestamp, User uses DB ID
+  username?: string;
+  question: string;
+  n1: number;
+  n2: number;
+  n3: number;
+  ai_response?: string;
+  timestamp: number;
+}

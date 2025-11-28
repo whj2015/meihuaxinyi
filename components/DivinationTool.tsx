@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { calculateDivination } from '../utils/meiHuaLogic';
-import { DivinationResult, AIProvider, UserProfile, CustomAIConfig } from '../types';
+import { DivinationResult, AIProvider, UserProfile, CustomAIConfig, HistoryRecord } from '../types';
 import HexagramVisual from './HexagramVisual';
 import { getInterpretation } from '../services/geminiService';
-import { Sparkles, ArrowRight, RefreshCcw, Settings, X, Check, User, LogOut, Gift, RotateCcw, Save, Loader2, Quote, BookOpen, Activity, UserCircle, Briefcase, GitCommit, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, MoveHorizontal } from 'lucide-react';
+import { Sparkles, ArrowRight, RefreshCcw, Settings, X, Check, User, LogOut, Gift, RotateCcw, Save, Loader2, Quote, BookOpen, Activity, UserCircle, Briefcase, GitCommit, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, MoveHorizontal, MessageCircle, Hash, History, Clock } from 'lucide-react';
 
 // --- Markdown Renderer ---
 const FormattedMarkdown: React.FC<{ text: string }> = ({ text }) => {
@@ -68,6 +68,7 @@ const DivinationTool: React.FC = () => {
   const [aiInterpretation, setAiInterpretation] = useState<string | null>(null);
 
   const [showSettings, setShowSettings] = useState(false);
+  const [showHistory, setShowHistory] = useState(false); // History Sidebar Toggle
   const [provider, setProvider] = useState<AIProvider>('deepseek'); // Default DeepSeek
   
   const [guestApiKeys, setGuestApiKeys] = useState({ gemini: '', deepseek: '' });
@@ -79,6 +80,10 @@ const DivinationTool: React.FC = () => {
   const [isAuthProcessing, setIsAuthProcessing] = useState(false);
   const [authMessage, setAuthMessage] = useState({ text: '', type: '' as 'success' | 'error' | '' });
   const [isSavingKeys, setIsSavingKeys] = useState(false);
+
+  // History State
+  const [historyList, setHistoryList] = useState<HistoryRecord[]>([]);
+  const [currentRecordId, setCurrentRecordId] = useState<number | string | null>(null);
 
   // Init
   useEffect(() => {
@@ -97,6 +102,32 @@ const DivinationTool: React.FC = () => {
         try { setCustomConfig(JSON.parse(savedCustomConfig)); } catch(e) {}
     }
   }, []);
+
+  // Fetch History when User changes (Logged In)
+  useEffect(() => {
+      if (user.isLoggedIn) {
+          fetchHistory(user.username);
+      } else {
+          // If logged out, keep guest history or clear? 
+          // Requirement: Guest history persists until refresh.
+          // But if we switch from user -> guest, we probably should start fresh or keep guest memory.
+          // For now, let's just keep whatever is in memory if it was guest mode, but clear if it was user mode.
+          // To simplify: If logging out, we clear the list to avoid showing previous user's data.
+          setHistoryList([]); 
+      }
+  }, [user.isLoggedIn, user.username]);
+
+  const fetchHistory = async (username: string) => {
+      try {
+          const res = await fetch(`/api/history?username=${username}`);
+          const data = await res.json();
+          if (data.success) {
+              setHistoryList(data.data);
+          }
+      } catch (e) {
+          console.error("Failed to fetch history", e);
+      }
+  };
 
   // Auth Logic
   const handleAuth = async () => {
@@ -155,6 +186,7 @@ const DivinationTool: React.FC = () => {
     setUser({ username: '', isLoggedIn: false });
     localStorage.removeItem('user_profile');
     setAuthForm({ username: '', password: '' });
+    // setHistoryList([]); // Handled by useEffect
   };
 
   const saveSettings = async () => {
@@ -196,6 +228,73 @@ const DivinationTool: React.FC = () => {
     }
   };
 
+  const saveHistory = async (q: string, n1: number, n2: number, n3: number) => {
+      const timestamp = Date.now();
+      
+      if (user.isLoggedIn) {
+          // Cloud Save
+          try {
+              const res = await fetch('/api/history', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                      username: user.username,
+                      question: q,
+                      n1, n2, n3,
+                      timestamp
+                  })
+              });
+              const data = await res.json();
+              if (data.success) {
+                  setCurrentRecordId(data.id);
+                  // Optimistically update list or refetch? Refetch is safer but slower. 
+                  // Let's manually prepend.
+                  const newRecord: HistoryRecord = { id: data.id, username: user.username, question: q, n1, n2, n3, timestamp };
+                  setHistoryList(prev => [newRecord, ...prev]);
+              }
+          } catch (e) { console.error("Save history failed", e); }
+      } else {
+          // Local Guest Save
+          const tempId = `guest-${timestamp}`;
+          setCurrentRecordId(tempId);
+          const newRecord: HistoryRecord = { id: tempId, question: q, n1, n2, n3, timestamp };
+          setHistoryList(prev => [newRecord, ...prev]);
+      }
+  };
+
+  const updateHistoryAI = async (text: string) => {
+      if (!currentRecordId) return;
+
+      // Update Local State first for UI responsiveness
+      setHistoryList(prev => prev.map(item => item.id === currentRecordId ? { ...item, ai_response: text } : item));
+
+      if (user.isLoggedIn) {
+           try {
+              await fetch('/api/history', {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                      id: currentRecordId,
+                      ai_response: text
+                  })
+              });
+           } catch(e) { console.error("Update AI history failed", e); }
+      }
+  };
+
+  const restoreHistory = (record: HistoryRecord) => {
+      setInputs([record.n1.toString(), record.n2.toString(), record.n3.toString()]);
+      setQuestion(record.question || "");
+      
+      const res = calculateDivination(record.n1, record.n2, record.n3);
+      setResult(res);
+      setAiInterpretation(record.ai_response || null);
+      setCurrentRecordId(record.id || null);
+      setShowHistory(false);
+      
+      setTimeout(() => document.getElementById('result-start')?.scrollIntoView({behavior:'smooth'}), 100);
+  };
+
   const handleAskAI = async () => {
     if (!result) return;
     setLoadingAI(true);
@@ -207,12 +306,16 @@ const DivinationTool: React.FC = () => {
         customConfig: provider === 'custom' ? customConfig : undefined
     };
 
+    let fullText = "";
     const resText = await getInterpretation(
         result, 
         question, 
         provider, 
         config,
-        (text) => setAiInterpretation(text)
+        (text) => {
+            setAiInterpretation(text);
+            fullText = text;
+        }
     );
     
     setLoadingAI(false);
@@ -221,6 +324,11 @@ const DivinationTool: React.FC = () => {
         const updatedUser = { ...user, usageCount: (user.usageCount || 0) + 1 };
         setUser(updatedUser);
         localStorage.setItem('user_profile', JSON.stringify(updatedUser));
+    }
+
+    // Save/Update AI Response to History
+    if (fullText && !fullText.includes("错误")) {
+        updateHistoryAI(fullText);
     }
   };
 
@@ -234,9 +342,14 @@ const DivinationTool: React.FC = () => {
   const handleCalculate = () => {
      const nums = inputs.map(i => parseInt(i, 10));
      if (nums.some(isNaN)) { alert("请输入数字"); return; }
+     
      const res = calculateDivination(nums[0], nums[1], nums[2]);
      setResult(res);
      setAiInterpretation(null);
+     
+     // Create History Record
+     saveHistory(question, nums[0], nums[1], nums[2]);
+
      setTimeout(() => document.getElementById('result-start')?.scrollIntoView({behavior:'smooth'}), 100);
   };
   
@@ -252,7 +365,6 @@ const DivinationTool: React.FC = () => {
 
   const remainingFree = 5 - (user.usageCount || 0);
   const isFreeTierAvailable = user.isLoggedIn && remainingFree > 0 && provider !== 'custom';
-  // Subtle indicator: Show only if NOT logged in, or logged in and using free tier.
   const shouldShowSettingsDot = !user.isLoggedIn; 
 
   const getScoreColor = (score: string) => {
@@ -304,10 +416,69 @@ const DivinationTool: React.FC = () => {
 
   const relationVisual = renderRelationVisual();
 
+  const numLabels = ["上卦数", "下卦数", "动爻数"];
+
   return (
     <div className="w-full space-y-8 relative">
       
-      {/* Settings Modal */}
+      {/* History Sidebar */}
+      {showHistory && (
+          <div className="fixed inset-0 z-[110] flex justify-end">
+              <div className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm" onClick={() => setShowHistory(false)}></div>
+              <div className="relative w-80 max-w-[85vw] h-full bg-white shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col">
+                  <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                      <h3 className="font-serif font-bold text-slate-800 flex items-center gap-2">
+                          <History size={18}/> 起卦记录
+                      </h3>
+                      <button onClick={() => setShowHistory(false)} className="p-1 hover:bg-slate-200 rounded-full transition-colors">
+                          <X size={18} className="text-slate-400"/>
+                      </button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
+                      {historyList.length === 0 ? (
+                          <div className="text-center py-10 text-slate-400 text-sm">
+                              <History size={32} className="mx-auto mb-2 opacity-30"/>
+                              暂无记录
+                          </div>
+                      ) : (
+                          historyList.map((record) => (
+                              <div 
+                                key={record.id} 
+                                onClick={() => restoreHistory(record)}
+                                className="bg-white border border-slate-100 rounded-xl p-3 shadow-sm hover:shadow-md hover:border-amber-200 cursor-pointer transition-all group"
+                              >
+                                  <div className="flex justify-between items-start mb-2">
+                                      <div className="font-serif font-bold text-slate-800 text-sm line-clamp-1">
+                                          {record.question || "无题测算"}
+                                      </div>
+                                      <div className="text-[10px] text-slate-400 font-mono">
+                                          {new Date(record.timestamp).toLocaleDateString()}
+                                      </div>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 p-1.5 rounded-lg mb-2">
+                                      <Hash size={10}/>
+                                      <span className="font-mono tracking-widest">{record.n1}-{record.n2}-{record.n3}</span>
+                                  </div>
+                                  {record.ai_response && (
+                                      <div className="flex items-center gap-1 text-[10px] text-amber-600 font-medium">
+                                          <Sparkles size={10}/> 已有大师解读
+                                      </div>
+                                  )}
+                              </div>
+                          ))
+                      )}
+                  </div>
+                  {!user.isLoggedIn && (
+                      <div className="p-3 bg-amber-50 text-[10px] text-amber-800 text-center border-t border-amber-100">
+                          当前为访客模式，刷新页面后记录将丢失。<br/>
+                          <span className="font-bold underline cursor-pointer" onClick={() => {setShowHistory(false); setShowSettings(true);}}>登录</span> 以永久保存。
+                      </div>
+                  )}
+              </div>
+          </div>
+      )}
+
+      {/* Settings Modal (Same as before) */}
       {showSettings && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-end md:items-center justify-center p-0 md:p-4">
           <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col animate-in slide-in-from-bottom-10 md:slide-in-from-bottom-0 duration-200">
@@ -416,37 +587,59 @@ const DivinationTool: React.FC = () => {
             <h2 className="text-2xl font-serif font-bold text-slate-900 flex items-center gap-3">
                 数字起卦
             </h2>
-            <button onClick={()=>setShowSettings(true)} className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-full transition-all relative">
-               <Settings size={20}/>
-               {shouldShowSettingsDot && (
-                   <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-amber-500 rounded-full border-2 border-white"></span>
-               )}
-            </button>
+            
+            <div className="flex gap-2">
+                <button onClick={()=>setShowHistory(true)} className="flex items-center gap-2 px-3 py-2 rounded-full border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 transition-all shadow-sm">
+                    <History size={18} />
+                    <span className="text-xs font-bold hidden md:inline">起卦记录</span>
+                </button>
+                <button onClick={()=>setShowSettings(true)} className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all shadow-sm group ${shouldShowSettingsDot ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                   <div className="relative">
+                       <Settings size={18} className="group-hover:rotate-45 transition-transform duration-500"/>
+                       {shouldShowSettingsDot && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>}
+                   </div>
+                   <span className="text-xs font-bold">配置 AI</span>
+                </button>
+            </div>
         </div>
 
         {/* Inputs */}
-        <div className="space-y-6 md:space-y-8">
-            <div className="relative group">
-                <input type="text" value={question} onChange={e=>setQuestion(e.target.value)} placeholder=" " className="peer w-full py-3 bg-transparent border-b-2 border-slate-100 focus:border-slate-900 outline-none text-lg transition-colors z-10 relative"/>
-                <label className="absolute left-0 top-3 text-slate-400 text-lg transition-all peer-focus:-top-4 peer-focus:text-xs peer-focus:text-slate-500 peer-focus:font-bold peer-[&:not(:placeholder-shown)]:-top-4 peer-[&:not(:placeholder-shown)]:text-xs peer-[&:not(:placeholder-shown)]:text-slate-500 pointer-events-none">所问何事？(可选)</label>
+        <div className="space-y-8">
+            {/* Question Input */}
+            <div className="bg-slate-50/50 p-1.5 rounded-2xl border border-slate-200 focus-within:border-amber-400 focus-within:bg-white focus-within:ring-4 focus-within:ring-amber-50 transition-all">
+                <div className="flex items-center gap-3 px-3 py-2">
+                    <div className="w-10 h-10 rounded-xl bg-slate-200 text-slate-500 flex items-center justify-center shrink-0">
+                        <MessageCircle size={20}/>
+                    </div>
+                    <div className="flex-1">
+                         <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">所测何事 (可选)</label>
+                         <input type="text" value={question} onChange={e=>setQuestion(e.target.value)} placeholder="例如：今日财运如何？/ 丢失的钥匙在哪里？" className="w-full bg-transparent outline-none text-slate-800 font-medium placeholder:text-slate-300 text-base md:text-lg"/>
+                    </div>
+                </div>
             </div>
 
-            <div className="flex gap-3 md:gap-6">
+            {/* Number Inputs */}
+            <div className="grid grid-cols-3 gap-3 md:gap-6">
                 {inputs.map((val,idx)=>(
-                    <div key={idx} className="flex-1 relative group">
-                         <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-white px-2 text-[10px] text-slate-400 font-mono z-10">NO.{idx+1}</div>
-                        <input 
-                            type="number" 
-                            value={val} 
-                            onChange={e=>handleInputChange(idx,e.target.value)} 
-                            className="w-full text-center text-2xl md:text-3xl font-serif h-20 md:h-24 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:border-amber-400 focus:ring-4 focus:ring-amber-50 outline-none transition-all placeholder:text-slate-200"
-                            placeholder="0"
-                        />
+                    <div key={idx} className="flex flex-col gap-2">
+                        <div className="text-center text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center justify-center gap-1">
+                            <Hash size={12}/> {numLabels[idx]}
+                        </div>
+                        <div className="relative group">
+                            <div className="absolute top-2 left-2 text-[10px] text-slate-300 font-mono pointer-events-none">#{idx+1}</div>
+                            <input 
+                                type="number" 
+                                value={val} 
+                                onChange={e=>handleInputChange(idx,e.target.value)} 
+                                className="w-full text-center text-3xl md:text-4xl font-serif h-20 md:h-24 rounded-2xl border-2 border-slate-100 bg-slate-50/50 focus:bg-white focus:border-amber-400 focus:ring-4 focus:ring-amber-50 outline-none transition-all placeholder:text-slate-200 text-slate-800"
+                                placeholder="0-999"
+                            />
+                        </div>
                     </div>
                 ))}
             </div>
 
-            <div className="flex gap-4 pt-2">
+            <div className="flex gap-4 pt-4 border-t border-slate-100/50">
                 <button onClick={handleRandom} className="w-16 h-14 md:h-16 flex items-center justify-center rounded-2xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 active:scale-95 transition-all" title="随机生成">
                     <RefreshCcw size={22}/>
                 </button>
