@@ -4,7 +4,7 @@ import { calculateDivination } from '../utils/meiHuaLogic';
 import { DivinationResult, AIProvider, UserProfile, CustomAIConfig } from '../types';
 import HexagramVisual from './HexagramVisual';
 import { getInterpretation } from '../services/geminiService';
-import { Sparkles, ArrowRight, RefreshCcw, Settings, X, Check, User, LogOut, Gift, RotateCcw, Save, Loader2, Quote, BookOpen, Activity } from 'lucide-react';
+import { Sparkles, ArrowRight, RefreshCcw, Settings, X, Check, User, LogOut, Gift, RotateCcw, Save, Loader2, Quote, BookOpen, Activity, UserCircle, Briefcase } from 'lucide-react';
 
 // 升级版 Markdown 渲染器：支持标题、列表、段落
 const FormattedMarkdown: React.FC<{ text: string }> = ({ text }) => {
@@ -279,6 +279,11 @@ const DivinationTool: React.FC = () => {
       return '平';
   };
 
+  // Helper to extract Ti and Yong Trigrams
+  const tiTrigram = result ? (result.tiGua === 'upper' ? result.originalHexagram.upper : result.originalHexagram.lower) : null;
+  const yongTrigram = result ? (result.yongGua === 'upper' ? result.originalHexagram.upper : result.originalHexagram.lower) : null;
+
+
   return (
     <div className="max-w-3xl mx-auto space-y-5 pb-24 relative px-2 md:px-0">
       
@@ -429,7 +434,7 @@ const DivinationTool: React.FC = () => {
         </div>
       </div>
 
-      {result && (
+      {result && tiTrigram && yongTrigram && (
         <div id="result-section" className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 scroll-mt-24">
             {/* Hexagram Cards */}
             <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col md:flex-row items-center justify-around gap-6 md:gap-0">
@@ -438,22 +443,50 @@ const DivinationTool: React.FC = () => {
                 <HexagramVisual hexagram={result.changedHexagram} label="变卦"/>
             </div>
 
-            {/* Core Conclusion Card (New) */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 relative overflow-hidden">
+            {/* Core Conclusion Card (Optimized Ti/Yong Analysis) */}
+            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden">
                  <div className="absolute top-0 right-0 p-2 opacity-5">
                     <Activity size={100} />
                  </div>
-                 <div className="flex items-center gap-4 z-10">
-                     <div className="w-12 h-12 rounded-2xl bg-slate-800 text-white flex items-center justify-center font-serif font-bold text-xl shadow-lg shadow-slate-200">
-                        断
+                 
+                 <div className="flex flex-col gap-4 relative z-10">
+                     <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-slate-800 text-white flex items-center justify-center font-serif font-bold text-lg shadow-lg shadow-slate-200">
+                                断
+                            </div>
+                            <span className="font-serif font-bold text-slate-700">核心结论</span>
+                        </div>
+                         <div className={`px-4 py-1.5 rounded-lg text-sm font-bold border ${getScoreColor(result.relationScore)}`}>
+                             {getScoreLabel(result.relationScore)}
+                         </div>
                      </div>
-                     <div>
-                         <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">五行体用分析</div>
-                         <div className="text-lg font-bold text-slate-800 font-serif">{result.relation}</div>
+
+                     {/* Ti / Yong Detailed Analysis */}
+                     <div className="grid grid-cols-2 gap-3 text-sm">
+                         <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex flex-col items-center text-center">
+                             <div className="flex items-center gap-1 text-slate-400 text-xs mb-1">
+                                <UserCircle size={14}/>
+                                体卦 (代表自己)
+                             </div>
+                             <div className="font-serif font-bold text-slate-800 text-lg">
+                                 {tiTrigram.name} <span className="text-xs font-normal text-slate-500">({tiTrigram.element})</span>
+                             </div>
+                         </div>
+                         <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex flex-col items-center text-center">
+                             <div className="flex items-center gap-1 text-slate-400 text-xs mb-1">
+                                <Briefcase size={14}/>
+                                用卦 (代表事物)
+                             </div>
+                             <div className="font-serif font-bold text-slate-800 text-lg">
+                                 {yongTrigram.name} <span className="text-xs font-normal text-slate-500">({yongTrigram.element})</span>
+                             </div>
+                         </div>
                      </div>
-                 </div>
-                 <div className={`px-5 py-2 rounded-xl text-sm font-bold border z-10 ${getScoreColor(result.relationScore)} shadow-sm`}>
-                     {getScoreLabel(result.relationScore)}
+                     
+                     <div className="bg-amber-50 rounded-xl p-3 text-center border border-amber-100">
+                         <p className="text-amber-900 font-bold font-serif">{result.relation}</p>
+                     </div>
                  </div>
             </div>
 
