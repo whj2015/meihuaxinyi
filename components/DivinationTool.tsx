@@ -5,7 +5,24 @@ import { DivinationResult, AIProvider, UserProfile } from '../types';
 import HexagramVisual from './HexagramVisual';
 import { getInterpretation } from '../services/geminiService';
 import { getEnvVar } from '../utils/envUtils';
-import { Sparkles, ArrowRight, RefreshCcw, BrainCircuit, Settings, X, Check, ArrowDown, ScrollText, LogIn, LogOut, User, KeyRound, Loader2, Save, Cloud, UserPlus, AlertCircle } from 'lucide-react';
+import { Sparkles, ArrowRight, RefreshCcw, BrainCircuit, Settings, X, Check, ScrollText, LogIn, LogOut, User, KeyRound, Loader2, Save, Cloud, UserPlus, AlertCircle } from 'lucide-react';
+
+// 简单 Base64 编码/解码，防止 Key 明文直接暴露在 LocalStorage
+const encodeData = (data: any) => {
+  try {
+    return btoa(JSON.stringify(data));
+  } catch (e) {
+    return '';
+  }
+};
+
+const decodeData = (str: string) => {
+  try {
+    return JSON.parse(atob(str));
+  } catch (e) {
+    return null;
+  }
+};
 
 const DivinationTool: React.FC = () => {
   const [inputs, setInputs] = useState<string[]>(['', '', '']);
@@ -32,35 +49,41 @@ const DivinationTool: React.FC = () => {
 
   // Initialization
   useEffect(() => {
-    // 1. Load User Profile (Persistence)
-    const savedUser = localStorage.getItem('user_profile');
-    if (savedUser) {
-        setUser(JSON.parse(savedUser));
+    // 1. Load User Profile
+    const savedUserStr = localStorage.getItem('user_profile');
+    let isLoggedIn = false;
+    if (savedUserStr) {
+        const savedUser = JSON.parse(savedUserStr);
+        setUser(savedUser);
+        isLoggedIn = savedUser.isLoggedIn;
     }
     
     // 2. Load Provider Preference
     const savedProvider = (localStorage.getItem('ai_provider') as AIProvider) || 'gemini';
     setProvider(savedProvider);
 
-    // 3. Initialize Keys: 
-    //    - Priority 1: Env Vars (Always load as base)
-    //    - Note: We DO NOT load from localStorage anymore for keys to satisfy "delete after refresh" for guests.
-    //    - If user was logged in, we ideally should have fetched keys again or stored them in session. 
-    //    - For this logic, we rely on the user re-entering or the keys being fetched upon explicit login action if session expired.
-    //    - However, to keep user logged in UX smooth, we usually store token. Since we store profile, 
-    //      we will rely on the user having to re-login to fetch cloud keys if they refreshed, OR we assume
-    //      if localstorage has profile, we might need to re-fetch keys. 
-    //      BUT, the requirement is "Refresh deletes keys if not logged in". 
-    //      If logged in, we should try to fetch keys or keep them. 
-    //      Let's implement a "silent login/fetch" if user profile exists to restore keys, 
-    //      or just keep it simple: Refreshing clears keys from memory. User needs to click "Login" again to fetch cloud keys? 
-    //      Better UX: If savedUser exists, we clear it on refresh? No, usually persistence is desired.
-    //      Let's follow strictly: "If not logged in -> temp. If logged in -> cloud".
-    //      We won't store keys in localStorage at all.
-    setApiKeys({
+    // 3. Initialize Keys logic
+    // 默认从环境变量读取
+    let initialKeys = {
       gemini: getEnvVar('Gemini_key') || '',
       deepseek: getEnvVar('DeepSeek_key') || ''
-    });
+    };
+
+    // 如果用户已登录，尝试从本地缓存恢复 Key (解决刷新丢失问题)
+    if (isLoggedIn) {
+      const cachedKeysStr = localStorage.getItem('user_keys_cache');
+      if (cachedKeysStr) {
+        const cachedKeys = decodeData(cachedKeysStr);
+        if (cachedKeys) {
+          initialKeys = {
+            gemini: cachedKeys.gemini || initialKeys.gemini,
+            deepseek: cachedKeys.deepseek || initialKeys.deepseek
+          };
+        }
+      }
+    }
+
+    setApiKeys(initialKeys);
   }, []);
 
   // --- Auth Logic ---
@@ -88,8 +111,6 @@ const DivinationTool: React.FC = () => {
         if (authMode === 'register') {
             setAuthMessage({ text: '注册成功，正在登录...', type: 'success' });
             // Auto login after register
-            setAuthMode('login'); 
-            // Recursively call login or just wait for user? Let's auto-trigger login logic
             const loginRes = await fetch('/api/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -115,22 +136,27 @@ const DivinationTool: React.FC = () => {
   const processLoginSuccess = (data: any) => {
     const newUser = { username: data.username, isLoggedIn: true };
     setUser(newUser);
-    localStorage.setItem('user_profile', JSON.stringify(newUser)); // Persist Login State
+    localStorage.setItem('user_profile', JSON.stringify(newUser));
 
-    // Sync Keys from Cloud
-    setApiKeys(prev => ({
-        gemini: data.keys.gemini || prev.gemini,
-        deepseek: data.keys.deepseek || prev.deepseek
-    }));
+    // Keys Logic:
+    // 1. Merge cloud keys with current env keys if cloud is empty
+    const newKeys = {
+        gemini: data.keys.gemini || apiKeys.gemini,
+        deepseek: data.keys.deepseek || apiKeys.deepseek
+    };
+    
+    setApiKeys(newKeys);
+    
+    // 2. Cache keys locally for persistence across refresh
+    localStorage.setItem('user_keys_cache', encodeData(newKeys));
 
-    setAuthMessage({ text: '登录成功，云端 Key 已同步', type: 'success' });
-    // Keep password for update operations (In real app, use token)
-    // We won't store password in localstorage, just in memory state 'authForm' is enough for current session updates
+    setAuthMessage({ text: '登录成功', type: 'success' });
   };
 
   const handleLogout = () => {
     setUser({ username: '', isLoggedIn: false });
     localStorage.removeItem('user_profile');
+    localStorage.removeItem('user_keys_cache'); // Clear cached keys
     
     // Reset Keys to Env or Empty (Memory Wipe)
     setApiKeys({
@@ -149,7 +175,10 @@ const DivinationTool: React.FC = () => {
 
     // 2. Handle Keys
     if (user.isLoggedIn) {
-        // Sync to Cloud
+        // A. Update Local Cache first
+        localStorage.setItem('user_keys_cache', encodeData(apiKeys));
+
+        // B. Sync to Cloud
         setIsSavingKeys(true);
         try {
             const response = await fetch('/api/update-keys', {
@@ -157,7 +186,7 @@ const DivinationTool: React.FC = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     username: user.username,
-                    password: authForm.password, // Need password to verify identity for update
+                    password: authForm.password, // In real app use token
                     gemini_key: apiKeys.gemini,
                     deepseek_key: apiKeys.deepseek
                 })
@@ -165,18 +194,18 @@ const DivinationTool: React.FC = () => {
             const data = await response.json();
             if (data.success) {
                 setShowSettings(false);
-                // Optional: Show toast
             } else {
-                alert(`保存失败: ${data.message} (可能需要重新登录)`);
+                alert(`保存至云端失败: ${data.message} (请尝试重新登录)`);
             }
         } catch (e) {
-            alert("保存至云端失败，请检查网络");
+            alert("网络连接失败，Key 已暂存本地，但未同步至云端。");
+            setShowSettings(false);
         } finally {
             setIsSavingKeys(false);
         }
     } else {
-        // Guest: Just close. Keys are already in State (Memory).
-        // They will be lost on refresh.
+        // Guest: Just close. Keys are in State (Memory).
+        // NOT saving to localStorage so they are lost on refresh.
         setShowSettings(false);
     }
   };
@@ -230,8 +259,13 @@ const DivinationTool: React.FC = () => {
       {/* Settings Modal */}
       {showSettings && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-end md:items-center justify-center p-0 md:p-4">
-          <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col animate-in slide-in-from-bottom-10 md:slide-in-from-bottom-0 md:zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0 rounded-t-2xl">
+          <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl w-full max-w-md max-h-[85vh] flex flex-col animate-in slide-in-from-bottom-10 md:slide-in-from-bottom-0 md:zoom-in-95 duration-200">
+             {/* Mobile Drag Handle Visual */}
+             <div className="md:hidden w-full flex justify-center pt-3 pb-1">
+                <div className="w-12 h-1.5 bg-slate-200 rounded-full"></div>
+             </div>
+
+            <div className="px-6 py-3 md:py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0 md:rounded-t-2xl">
               <h3 className="font-serif font-bold text-slate-800 flex items-center gap-2 text-lg">
                 <Settings size={20} className="text-slate-600" /> 
                 {user.isLoggedIn ? '云端同步' : '大师设置'}
@@ -241,9 +275,9 @@ const DivinationTool: React.FC = () => {
               </button>
             </div>
             
-            <div className="overflow-y-auto overflow-x-hidden no-scrollbar flex-1">
+            <div className="overflow-y-auto overflow-x-hidden no-scrollbar flex-1 overscroll-contain">
                 {/* Auth Section */}
-                <div className="p-6 bg-slate-50 border-b border-slate-100">
+                <div className="p-5 md:p-6 bg-slate-50 border-b border-slate-100">
                     {!user.isLoggedIn ? (
                         <div className="space-y-4">
                             <div className="flex items-center justify-between mb-2">
@@ -256,7 +290,7 @@ const DivinationTool: React.FC = () => {
                                         setAuthMode(authMode === 'login' ? 'register' : 'login');
                                         setAuthMessage({text:'', type:''});
                                     }}
-                                    className="text-xs text-amber-600 font-medium hover:underline"
+                                    className="text-xs text-amber-600 font-medium hover:underline px-2 py-1 bg-amber-50 rounded"
                                 >
                                     {authMode === 'login' ? '没有账号？去注册' : '已有账号？去登录'}
                                 </button>
@@ -269,7 +303,7 @@ const DivinationTool: React.FC = () => {
                                         placeholder="用户名"
                                         value={authForm.username}
                                         onChange={(e) => setAuthForm({...authForm, username: e.target.value})}
-                                        className="flex-1 p-3 text-sm border border-slate-200 rounded-lg outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-200 transition-all"
+                                        className="flex-1 p-3 text-sm border border-slate-200 rounded-lg outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-200 transition-all bg-white"
                                     />
                                 </div>
                                 <div className="flex gap-2">
@@ -278,7 +312,7 @@ const DivinationTool: React.FC = () => {
                                         placeholder="密码"
                                         value={authForm.password}
                                         onChange={(e) => setAuthForm({...authForm, password: e.target.value})}
-                                        className="flex-1 p-3 text-sm border border-slate-200 rounded-lg outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-200 transition-all"
+                                        className="flex-1 p-3 text-sm border border-slate-200 rounded-lg outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-200 transition-all bg-white"
                                     />
                                 </div>
                             </div>
@@ -292,7 +326,7 @@ const DivinationTool: React.FC = () => {
                             <button 
                                 onClick={handleAuth}
                                 disabled={isAuthProcessing}
-                                className="w-full py-2.5 bg-white border border-slate-300 text-slate-700 text-sm font-bold rounded-lg hover:bg-slate-50 hover:border-slate-400 transition active:scale-[0.98] flex justify-center items-center gap-2 shadow-sm"
+                                className="w-full py-3 bg-white border border-slate-300 text-slate-700 text-sm font-bold rounded-lg hover:bg-slate-50 hover:border-slate-400 transition active:scale-[0.98] flex justify-center items-center gap-2 shadow-sm"
                             >
                                 {isAuthProcessing ? <Loader2 size={16} className="animate-spin"/> : (authMode === 'login' ? <LogIn size={16} /> : <UserPlus size={16} />)}
                                 {isAuthProcessing ? '处理中...' : (authMode === 'login' ? '登录并同步 Key' : '立即注册')}
@@ -304,12 +338,12 @@ const DivinationTool: React.FC = () => {
                     ) : (
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 bg-gradient-to-br from-amber-100 to-amber-200 rounded-full flex items-center justify-center text-amber-800 font-bold text-lg shadow-inner">
+                                <div className="w-12 h-12 bg-gradient-to-br from-amber-100 to-amber-200 rounded-full flex items-center justify-center text-amber-800 font-bold text-lg shadow-inner border-2 border-white">
                                     {user.username.charAt(0).toUpperCase()}
                                 </div>
                                 <div>
                                     <p className="font-bold text-slate-800">{user.username}</p>
-                                    <p className="text-xs text-green-600 flex items-center gap-1 bg-green-50 px-1.5 py-0.5 rounded-full w-fit mt-1">
+                                    <p className="text-xs text-green-600 flex items-center gap-1 bg-green-50 px-2 py-0.5 rounded-full w-fit mt-1 border border-green-100">
                                         <Cloud size={10}/> 云端已连接
                                     </p>
                                 </div>
@@ -324,7 +358,7 @@ const DivinationTool: React.FC = () => {
                     )}
                 </div>
 
-                <div className="p-6 space-y-6">
+                <div className="p-5 md:p-6 space-y-6">
                     {/* Provider Selection */}
                     <div>
                         <label className="block text-sm font-bold text-slate-700 mb-3">选择解卦模型</label>
@@ -386,7 +420,7 @@ const DivinationTool: React.FC = () => {
                 </div>
             </div>
 
-            <div className="p-4 md:p-6 border-t border-slate-100 bg-white shrink-0 rounded-b-2xl">
+            <div className="p-4 md:p-6 border-t border-slate-100 bg-white shrink-0 md:rounded-b-2xl pb-8 md:pb-6">
                 <button 
                     onClick={saveSettings}
                     disabled={isSavingKeys}
@@ -408,7 +442,7 @@ const DivinationTool: React.FC = () => {
           title="设置"
         >
           <Settings size={22} />
-          {user.isLoggedIn && <span className="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white"></span>}
+          {user.isLoggedIn && <span className="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white shadow-sm"></span>}
         </button>
 
         <h2 className="text-xl md:text-2xl font-serif font-bold text-slate-800 mb-6 flex items-center gap-2.5">
@@ -418,7 +452,7 @@ const DivinationTool: React.FC = () => {
             数字起卦
         </h2>
         
-        <div className="mb-8">
+        <div className="mb-6 md:mb-8">
             <label className="block text-sm font-medium text-slate-500 mb-2 ml-1">心中所问之事</label>
             <input 
                 type="text" 
@@ -429,7 +463,7 @@ const DivinationTool: React.FC = () => {
             />
         </div>
 
-        <div className="grid grid-cols-3 gap-3 md:gap-8 mb-8">
+        <div className="grid grid-cols-3 gap-3 md:gap-8 mb-6 md:mb-8">
             {inputs.map((val, idx) => (
                 <div key={idx} className="flex flex-col gap-2 relative group">
                     <label className="text-[10px] md:text-xs text-slate-400 text-center uppercase tracking-wider font-bold">数 {idx + 1}</label>
@@ -438,7 +472,7 @@ const DivinationTool: React.FC = () => {
                         value={val}
                         onChange={(e) => handleInputChange(idx, e.target.value)}
                         placeholder="0-999"
-                        className="text-center text-3xl md:text-4xl font-serif h-16 md:h-20 rounded-2xl border-2 border-slate-100 focus:border-amber-400 focus:bg-amber-50/30 outline-none transition-all placeholder:text-slate-200 text-slate-800 shadow-sm"
+                        className="text-center text-3xl md:text-4xl font-serif h-20 md:h-24 rounded-2xl border-2 border-slate-100 focus:border-amber-400 focus:bg-amber-50/30 outline-none transition-all placeholder:text-slate-200 text-slate-800 shadow-sm"
                     />
                 </div>
             ))}
@@ -489,28 +523,28 @@ const DivinationTool: React.FC = () => {
             </div>
 
             {/* Analysis Card */}
-            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-l-4 border-amber-500 overflow-hidden relative">
+            <div className="bg-white p-5 md:p-8 rounded-3xl shadow-sm border-l-4 border-amber-500 overflow-hidden relative">
                 <div className="absolute top-0 right-0 p-6 opacity-[0.04] pointer-events-none">
                     <BrainCircuit size={160} />
                 </div>
-                <div className="flex items-center gap-2 mb-5">
+                <div className="flex items-center gap-2 mb-4 md:mb-5">
                     <div className="w-1.5 h-5 bg-amber-500 rounded-full"></div>
                     <h3 className="text-lg font-serif font-bold text-slate-800">体用分析</h3>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-3 md:gap-5 mb-5">
-                    <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100/50">
+                <div className="grid grid-cols-2 gap-3 md:gap-5 mb-4 md:mb-5">
+                    <div className="p-3 md:p-4 bg-slate-50/80 rounded-2xl border border-slate-100/50">
                         <span className="text-[10px] md:text-xs text-slate-400 block mb-1 uppercase tracking-wide">体卦 (自己)</span>
-                        <div className="font-bold text-slate-800 text-base md:text-lg flex flex-col md:flex-row md:items-baseline gap-1 md:gap-2">
+                        <div className="font-bold text-slate-800 text-sm md:text-lg flex flex-col md:flex-row md:items-baseline gap-1 md:gap-2">
                             {result.tiGua === 'upper' ? result.originalHexagram.upper.name : result.originalHexagram.lower.name}
                             <span className="text-[10px] w-fit px-2 py-0.5 bg-white border border-slate-200 rounded-full font-medium text-slate-500">
                                 属{result.tiGua === 'upper' ? result.originalHexagram.upper.element : result.originalHexagram.lower.element}
                             </span>
                         </div>
                     </div>
-                    <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100/50">
+                    <div className="p-3 md:p-4 bg-slate-50/80 rounded-2xl border border-slate-100/50">
                         <span className="text-[10px] md:text-xs text-slate-400 block mb-1 uppercase tracking-wide">用卦 (事物)</span>
-                        <div className="font-bold text-slate-800 text-base md:text-lg flex flex-col md:flex-row md:items-baseline gap-1 md:gap-2">
+                        <div className="font-bold text-slate-800 text-sm md:text-lg flex flex-col md:flex-row md:items-baseline gap-1 md:gap-2">
                             {result.yongGua === 'upper' ? result.originalHexagram.upper.name : result.originalHexagram.lower.name}
                              <span className="text-[10px] w-fit px-2 py-0.5 bg-white border border-slate-200 rounded-full font-medium text-slate-500">
                                 属{result.yongGua === 'upper' ? result.originalHexagram.upper.element : result.originalHexagram.lower.element}
@@ -518,7 +552,7 @@ const DivinationTool: React.FC = () => {
                         </div>
                     </div>
                 </div>
-                <div className={`p-4 rounded-2xl mb-6 border flex items-center gap-3 ${
+                <div className={`p-3 md:p-4 rounded-2xl mb-5 md:mb-6 border flex items-center gap-3 ${
                     result.relationScore.includes('Auspicious') ? 'bg-amber-50 text-amber-900 border-amber-100' : 
                     result.relationScore.includes('Bad') ? 'bg-stone-100 text-stone-700 border-stone-200' : 'bg-slate-50 text-slate-700 border-slate-100'
                 }`}>
@@ -530,20 +564,20 @@ const DivinationTool: React.FC = () => {
                     <button 
                         onClick={handleAskAI}
                         disabled={loadingAI}
-                        className={`w-full py-4 bg-gradient-to-r text-white rounded-2xl font-bold text-sm md:text-base tracking-wide shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2.5 ${provider === 'deepseek' ? 'from-indigo-600 to-indigo-800 shadow-indigo-200' : 'from-slate-800 to-slate-900 shadow-slate-200'}`}
+                        className={`w-full py-3.5 md:py-4 bg-gradient-to-r text-white rounded-2xl font-bold text-sm md:text-base tracking-wide shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2.5 ${provider === 'deepseek' ? 'from-indigo-600 to-indigo-800 shadow-indigo-200' : 'from-slate-800 to-slate-900 shadow-slate-200'}`}
                     >
                         {loadingAI ? '大师正在推演天机...' : `请 ${provider === 'deepseek' ? 'DeepSeek' : 'Gemini'} 大师详解`}
                         {loadingAI && <Loader2 size={18} className="animate-spin text-white/80"/>}
                     </button>
                 ) : (
-                    <div className="mt-8 pt-6 border-t border-slate-100 animate-in fade-in duration-700">
+                    <div className="mt-6 md:mt-8 pt-6 border-t border-slate-100 animate-in fade-in duration-700">
                         <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
                              <div className={`p-1.5 rounded-lg ${provider === 'deepseek' ? 'bg-indigo-100 text-indigo-600' : 'bg-amber-100 text-amber-600'}`}>
                                 <Sparkles size={14}/> 
                              </div>
                              {provider === 'deepseek' ? 'DeepSeek' : 'Gemini'} 大师解读
                         </h4>
-                        <div className="prose prose-slate prose-sm md:prose-base max-w-none text-slate-600 whitespace-pre-wrap leading-relaxed bg-slate-50 p-5 rounded-2xl border border-slate-100/80">
+                        <div className="prose prose-slate prose-sm md:prose-base max-w-none text-slate-600 whitespace-pre-wrap leading-relaxed bg-slate-50 p-4 md:p-5 rounded-2xl border border-slate-100/80">
                             {aiInterpretation}
                         </div>
                         <div className="mt-4 flex justify-end">
@@ -559,35 +593,35 @@ const DivinationTool: React.FC = () => {
             </div>
 
              {/* Ancient Text */}
-            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100 relative overflow-hidden group">
+            <div className="bg-white p-5 md:p-8 rounded-3xl shadow-sm border border-slate-100 relative overflow-hidden group">
                 <div className="absolute top-0 right-0 p-6 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity pointer-events-none">
                     <ScrollText size={140} />
                 </div>
-                <div className="flex items-center gap-2 mb-6">
+                <div className="flex items-center gap-2 mb-5 md:mb-6">
                     <div className="w-1.5 h-5 bg-slate-300 rounded-full"></div>
                     <h3 className="text-lg font-serif font-bold text-slate-800">古籍原典</h3>
                 </div>
                 
                 {result.originalHexagram.text ? (
-                    <div className="space-y-4">
-                        <div className="bg-[#f9f8f6] p-4 rounded-xl border-l-[3px] border-slate-300">
+                    <div className="space-y-3 md:space-y-4">
+                        <div className="bg-[#f9f8f6] p-3 md:p-4 rounded-xl border-l-[3px] border-slate-300">
                             <span className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">本卦卦辞</span>
-                            <p className="font-serif text-slate-700 text-base leading-relaxed">
+                            <p className="font-serif text-slate-700 text-sm md:text-base leading-relaxed">
                                 {result.originalHexagram.text.guaci}
                             </p>
                         </div>
                         
-                        <div className="bg-[#f9f8f6] p-4 rounded-xl border-l-[3px] border-slate-300">
+                        <div className="bg-[#f9f8f6] p-3 md:p-4 rounded-xl border-l-[3px] border-slate-300">
                              <span className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">大象传</span>
-                            <p className="font-serif text-slate-700 text-base leading-relaxed">
+                            <p className="font-serif text-slate-700 text-sm md:text-base leading-relaxed">
                                 {result.originalHexagram.text.xiang}
                             </p>
                         </div>
 
                         {result.movingLineText && (
-                           <div className="bg-red-50/50 p-4 rounded-xl border-l-[3px] border-cinnabar/60">
+                           <div className="bg-red-50/50 p-3 md:p-4 rounded-xl border-l-[3px] border-cinnabar/60">
                                 <span className="text-[10px] text-cinnabar/80 font-bold block mb-1.5 uppercase tracking-wider">动爻 (变数)</span>
-                                <p className="font-serif text-slate-800 text-lg leading-relaxed font-medium">
+                                <p className="font-serif text-slate-800 text-base md:text-lg leading-relaxed font-medium">
                                     {result.movingLineText}
                                 </p>
                            </div>
