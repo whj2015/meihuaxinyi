@@ -4,22 +4,67 @@ import { calculateDivination } from '../utils/meiHuaLogic';
 import { DivinationResult, AIProvider, UserProfile, CustomAIConfig } from '../types';
 import HexagramVisual from './HexagramVisual';
 import { getInterpretation } from '../services/geminiService';
-import { Sparkles, ArrowRight, RefreshCcw, Settings, X, Check, User, LogOut, Gift, RotateCcw, Save, Loader2 } from 'lucide-react';
+import { Sparkles, ArrowRight, RefreshCcw, Settings, X, Check, User, LogOut, Gift, RotateCcw, Save, Loader2, Quote } from 'lucide-react';
 
-// 简易 Markdown 渲染
-const SimpleMarkdown: React.FC<{ text: string }> = ({ text }) => {
+// 升级版 Markdown 渲染器：支持标题、列表、段落
+const FormattedMarkdown: React.FC<{ text: string }> = ({ text }) => {
   if (!text) return null;
-  const parts = text.split(/(\*\*.*?\*\*)/g);
+
+  const lines = text.split('\n');
+  
   return (
-    <span className="leading-relaxed break-words text-justify">
-      {parts.map((part, index) => {
-        if (part.startsWith('**') && part.endsWith('**')) {
-          return <strong key={index} className="text-slate-900 font-bold">{part.slice(2, -2)}</strong>;
+    <div className="space-y-3 font-serif text-slate-700">
+      {lines.map((line, idx) => {
+        const trimmed = line.trim();
+        if (!trimmed) return <div key={idx} className="h-1"></div>;
+
+        // 标题 (### 或 【】)
+        if (trimmed.startsWith('###') || trimmed.startsWith('【')) {
+            const content = trimmed.replace(/^###\s*/, '').replace(/[【】]/g, '');
+            return (
+                <h4 key={idx} className="text-base md:text-lg font-bold text-amber-800 mt-4 mb-2 flex items-center gap-2 border-l-4 border-amber-500 pl-3 bg-amber-50/50 py-1 rounded-r-lg">
+                    {content}
+                </h4>
+            );
         }
-        return <span key={index}>{part}</span>;
+
+        // 列表项 (- 或 *)
+        if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+            const content = trimmed.substring(2);
+            return (
+                <div key={idx} className="flex gap-2 ml-1 md:ml-2">
+                    <span className="text-amber-500 mt-1.5">•</span>
+                    <p className="flex-1 leading-relaxed">
+                        <InlineBold text={content} />
+                    </p>
+                </div>
+            );
+        }
+
+        // 普通段落
+        return (
+            <p key={idx} className="leading-7 text-justify text-sm md:text-base">
+                <InlineBold text={trimmed} />
+            </p>
+        );
       })}
-    </span>
+    </div>
   );
+};
+
+// 辅助组件：处理行内加粗
+const InlineBold: React.FC<{ text: string }> = ({ text }) => {
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+    return (
+        <>
+            {parts.map((part, index) => {
+                if (part.startsWith('**') && part.endsWith('**')) {
+                    return <strong key={index} className="text-slate-900 font-bold bg-amber-100/50 px-0.5 rounded">{part.slice(2, -2)}</strong>;
+                }
+                return <span key={index}>{part}</span>;
+            })}
+        </>
+    );
 };
 
 const DivinationTool: React.FC = () => {
@@ -126,14 +171,22 @@ const DivinationTool: React.FC = () => {
     if (user.isLoggedIn && provider !== 'custom') {
         setIsSavingKeys(true);
         try {
+            // Key is sent via Header, encoded to prevent body logging
+            // Note: In real production, use HTTPS + Backend Proxy (implemented)
+            // Here we send Base64 in header as a simple obfuscation layer before reaching our backend
+            const encodeKey = (k: string) => k ? btoa(encodeURIComponent(k)) : "";
+            
             const response = await fetch('/api/update-keys', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'x-gemini-token': encodeKey(guestApiKeys.gemini),
+                    'x-deepseek-token': encodeKey(guestApiKeys.deepseek)
+                },
                 body: JSON.stringify({
                     username: user.username,
                     password: authForm.password,
-                    gemini_key: guestApiKeys.gemini,    
-                    deepseek_key: guestApiKeys.deepseek 
+                    // keys are in headers
                 })
             });
             const data = await response.json();
@@ -210,9 +263,6 @@ const DivinationTool: React.FC = () => {
 
   const remainingFree = 5 - (user.usageCount || 0);
   const isFreeTierAvailable = user.isLoggedIn && remainingFree > 0 && provider !== 'custom';
-  // 简化提示：只要没登录，或者登录了但没配置Key且有免费次数，都显示红点引导去设置/查看
-  // 但用户要求“不要过分明显”。
-  // 我们只在确实需要用户操作时显示（例如完全没Key，或者想告知有免费额度）
   const shouldShowSettingsDot = !user.isLoggedIn || (user.isLoggedIn && remainingFree > 0);
 
   return (
@@ -328,7 +378,6 @@ const DivinationTool: React.FC = () => {
             </h2>
             <button onClick={()=>setShowSettings(true)} className="text-slate-400 hover:text-slate-700 p-2 rounded-full hover:bg-slate-50 relative group">
                <Settings size={22}/>
-               {/* 优化后的标识：温和的红点 */}
                {shouldShowSettingsDot && (
                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
                )}
@@ -377,8 +426,9 @@ const DivinationTool: React.FC = () => {
 
             {/* AI Analysis Card */}
             <div className="bg-white p-5 md:p-8 rounded-3xl shadow-sm border-l-4 border-amber-500 overflow-hidden relative">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
                     <div className="flex items-center gap-2">
+                        <Quote size={20} className="text-amber-500/50" />
                         <h3 className="text-lg font-serif font-bold text-slate-800">大师详解</h3>
                         {isFreeTierAvailable && !aiInterpretation && (
                              <span className="text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full font-medium">免费额度: {remainingFree}</span>
@@ -393,13 +443,21 @@ const DivinationTool: React.FC = () => {
                 </div>
 
                 {!aiInterpretation ? (
-                    <button onClick={handleAskAI} disabled={loadingAI} className="w-full py-4 bg-gradient-to-r from-amber-600 to-amber-700 text-white rounded-xl font-bold shadow-md active:scale-[0.98] transition-all flex justify-center items-center gap-2">
-                        {loadingAI ? '大师推演中...' : 'AI 大师解卦'} {loadingAI && <Loader2 className="animate-spin" size={18}/>}
-                    </button>
+                    <div className="py-8">
+                        <p className="text-slate-400 text-center text-sm mb-6 px-4">
+                            融合《梅花易数》古法与现代 AI 智慧，为您提供详尽的运势分析。
+                        </p>
+                        <button onClick={handleAskAI} disabled={loadingAI} className="w-full py-4 bg-gradient-to-r from-amber-600 to-amber-700 text-white rounded-xl font-bold shadow-md active:scale-[0.98] transition-all flex justify-center items-center gap-2">
+                            {loadingAI ? '大师推演中...' : 'AI 大师解卦'} {loadingAI && <Loader2 className="animate-spin" size={18}/>}
+                        </button>
+                    </div>
                 ) : (
-                    <div className="bg-slate-50/80 p-4 md:p-6 rounded-2xl text-slate-700 text-sm md:text-base leading-relaxed border border-slate-100/50">
-                        <SimpleMarkdown text={aiInterpretation}/>
+                    <div className="bg-[#fdfbf7] p-4 md:p-6 rounded-2xl border border-slate-100 shadow-inner">
+                        <FormattedMarkdown text={aiInterpretation}/>
                         <div className="h-4 w-1 bg-amber-500 animate-pulse inline-block ml-1 align-middle"></div>
+                        <div className="mt-8 pt-4 border-t border-slate-200/50 text-center">
+                            <p className="text-[10px] text-slate-300 font-serif">此结果仅供娱乐与参考，切勿迷信</p>
+                        </div>
                     </div>
                 )}
             </div>
