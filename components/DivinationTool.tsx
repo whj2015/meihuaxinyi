@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { calculateDivination } from '../utils/meiHuaLogic';
 import { DivinationResult, AIProvider, UserProfile } from '../types';
 import HexagramVisual from './HexagramVisual';
 import { getInterpretation } from '../services/geminiService';
 import { getEnvVar } from '../utils/envUtils';
-import { Sparkles, ArrowRight, RefreshCcw, BrainCircuit, Settings, X, Check, ArrowDown, ScrollText, LogIn, LogOut, User, KeyRound, Loader2 } from 'lucide-react';
+import { Sparkles, ArrowRight, RefreshCcw, BrainCircuit, Settings, X, Check, ArrowDown, ScrollText, LogIn, LogOut, User, KeyRound, Loader2, Save, Cloud, UserPlus, AlertCircle } from 'lucide-react';
 
 const DivinationTool: React.FC = () => {
   const [inputs, setInputs] = useState<string[]>(['', '', '']);
@@ -23,76 +24,164 @@ const DivinationTool: React.FC = () => {
 
   // User Auth State
   const [user, setUser] = useState<UserProfile>({ username: '', isLoggedIn: false });
-  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [loginMessage, setLoginMessage] = useState('');
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authForm, setAuthForm] = useState({ username: '', password: '' });
+  const [isAuthProcessing, setIsAuthProcessing] = useState(false);
+  const [authMessage, setAuthMessage] = useState({ text: '', type: '' as 'success' | 'error' | '' });
+  const [isSavingKeys, setIsSavingKeys] = useState(false);
 
-  // Initialize Keys from Env or LocalStorage
+  // Initialization
   useEffect(() => {
-    const savedGemini = localStorage.getItem('gemini_key') || getEnvVar('Gemini_key') || '';
-    const savedDeepSeek = localStorage.getItem('deepseek_key') || getEnvVar('DeepSeek_key') || '';
-    const savedProvider = (localStorage.getItem('ai_provider') as AIProvider) || 'gemini';
+    // 1. Load User Profile (Persistence)
     const savedUser = localStorage.getItem('user_profile');
-
-    setApiKeys({ gemini: savedGemini, deepseek: savedDeepSeek });
-    setProvider(savedProvider);
-
     if (savedUser) {
         setUser(JSON.parse(savedUser));
     }
+    
+    // 2. Load Provider Preference
+    const savedProvider = (localStorage.getItem('ai_provider') as AIProvider) || 'gemini';
+    setProvider(savedProvider);
+
+    // 3. Initialize Keys: 
+    //    - Priority 1: Env Vars (Always load as base)
+    //    - Note: We DO NOT load from localStorage anymore for keys to satisfy "delete after refresh" for guests.
+    //    - If user was logged in, we ideally should have fetched keys again or stored them in session. 
+    //    - For this logic, we rely on the user re-entering or the keys being fetched upon explicit login action if session expired.
+    //    - However, to keep user logged in UX smooth, we usually store token. Since we store profile, 
+    //      we will rely on the user having to re-login to fetch cloud keys if they refreshed, OR we assume
+    //      if localstorage has profile, we might need to re-fetch keys. 
+    //      BUT, the requirement is "Refresh deletes keys if not logged in". 
+    //      If logged in, we should try to fetch keys or keep them. 
+    //      Let's implement a "silent login/fetch" if user profile exists to restore keys, 
+    //      or just keep it simple: Refreshing clears keys from memory. User needs to click "Login" again to fetch cloud keys? 
+    //      Better UX: If savedUser exists, we clear it on refresh? No, usually persistence is desired.
+    //      Let's follow strictly: "If not logged in -> temp. If logged in -> cloud".
+    //      We won't store keys in localStorage at all.
+    setApiKeys({
+      gemini: getEnvVar('Gemini_key') || '',
+      deepseek: getEnvVar('DeepSeek_key') || ''
+    });
   }, []);
 
-  const saveSettings = () => {
-    localStorage.setItem('gemini_key', apiKeys.gemini);
-    localStorage.setItem('deepseek_key', apiKeys.deepseek);
-    localStorage.setItem('ai_provider', provider);
-    setShowSettings(false);
-  };
+  // --- Auth Logic ---
 
-  // --- 真实登录逻辑 (连接 /api/login) ---
-  const handleLogin = async () => {
-    if (!loginForm.username || !loginForm.password) return;
-    setIsLoggingIn(true);
-    setLoginMessage('');
+  const handleAuth = async () => {
+    if (!authForm.username || !authForm.password) {
+        setAuthMessage({ text: '请输入用户名和密码', type: 'error' });
+        return;
+    }
+    setIsAuthProcessing(true);
+    setAuthMessage({ text: '', type: '' });
+
+    const endpoint = authMode === 'login' ? '/api/login' : '/api/register';
 
     try {
-      const response = await fetch('/api/login', {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(loginForm)
+        body: JSON.stringify(authForm)
       });
 
       const data = await response.json();
 
       if (response.ok && data.success) {
-        const newUser = { username: data.username, isLoggedIn: true };
-        setUser(newUser);
-        localStorage.setItem('user_profile', JSON.stringify(newUser));
-
-        // 自动填充从云端获取的 Key
-        setApiKeys(prev => ({
-          gemini: data.keys.gemini || prev.gemini,
-          deepseek: data.keys.deepseek || prev.deepseek
-        }));
-
-        setLoginMessage('登录成功，云端 Key 已同步。');
+        if (authMode === 'register') {
+            setAuthMessage({ text: '注册成功，正在登录...', type: 'success' });
+            // Auto login after register
+            setAuthMode('login'); 
+            // Recursively call login or just wait for user? Let's auto-trigger login logic
+            const loginRes = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(authForm)
+            });
+            const loginData = await loginRes.json();
+            if (loginData.success) {
+                processLoginSuccess(loginData);
+            }
+        } else {
+            processLoginSuccess(data);
+        }
       } else {
-        setLoginMessage(data.message || '登录失败，请检查用户名或密码。');
+        setAuthMessage({ text: data.message || '操作失败', type: 'error' });
       }
     } catch (error) {
-      console.error('Login error:', error);
-      setLoginMessage('连接服务器失败，请稍后再试。');
+      setAuthMessage({ text: '网络连接错误', type: 'error' });
     } finally {
-      setIsLoggingIn(false);
+      setIsAuthProcessing(false);
     }
+  };
+
+  const processLoginSuccess = (data: any) => {
+    const newUser = { username: data.username, isLoggedIn: true };
+    setUser(newUser);
+    localStorage.setItem('user_profile', JSON.stringify(newUser)); // Persist Login State
+
+    // Sync Keys from Cloud
+    setApiKeys(prev => ({
+        gemini: data.keys.gemini || prev.gemini,
+        deepseek: data.keys.deepseek || prev.deepseek
+    }));
+
+    setAuthMessage({ text: '登录成功，云端 Key 已同步', type: 'success' });
+    // Keep password for update operations (In real app, use token)
+    // We won't store password in localstorage, just in memory state 'authForm' is enough for current session updates
   };
 
   const handleLogout = () => {
     setUser({ username: '', isLoggedIn: false });
     localStorage.removeItem('user_profile');
-    setLoginForm({ username: '', password: '' });
-    setLoginMessage('');
+    
+    // Reset Keys to Env or Empty (Memory Wipe)
+    setApiKeys({
+      gemini: getEnvVar('Gemini_key') || '',
+      deepseek: getEnvVar('DeepSeek_key') || ''
+    });
+    setAuthForm({ username: '', password: '' });
+    setAuthMessage({ text: '', type: '' });
   };
+
+  // --- Settings & Key Management ---
+
+  const saveSettings = async () => {
+    // 1. Save Provider Preference
+    localStorage.setItem('ai_provider', provider);
+
+    // 2. Handle Keys
+    if (user.isLoggedIn) {
+        // Sync to Cloud
+        setIsSavingKeys(true);
+        try {
+            const response = await fetch('/api/update-keys', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: user.username,
+                    password: authForm.password, // Need password to verify identity for update
+                    gemini_key: apiKeys.gemini,
+                    deepseek_key: apiKeys.deepseek
+                })
+            });
+            const data = await response.json();
+            if (data.success) {
+                setShowSettings(false);
+                // Optional: Show toast
+            } else {
+                alert(`保存失败: ${data.message} (可能需要重新登录)`);
+            }
+        } catch (e) {
+            alert("保存至云端失败，请检查网络");
+        } finally {
+            setIsSavingKeys(false);
+        }
+    } else {
+        // Guest: Just close. Keys are already in State (Memory).
+        // They will be lost on refresh.
+        setShowSettings(false);
+    }
+  };
+
+  // --- Divination Logic ---
 
   const handleInputChange = (index: number, value: string) => {
     if (value.length > 3) return; 
@@ -136,334 +225,331 @@ const DivinationTool: React.FC = () => {
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 pb-20 relative">
+    <div className="max-w-3xl mx-auto space-y-4 md:space-y-6 pb-24 relative px-0 md:px-0">
       
       {/* Settings Modal */}
       {showSettings && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-              <h3 className="font-serif font-bold text-slate-800 flex items-center gap-2">
-                <Settings size={18} /> 大师设置
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-end md:items-center justify-center p-0 md:p-4">
+          <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col animate-in slide-in-from-bottom-10 md:slide-in-from-bottom-0 md:zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0 rounded-t-2xl">
+              <h3 className="font-serif font-bold text-slate-800 flex items-center gap-2 text-lg">
+                <Settings size={20} className="text-slate-600" /> 
+                {user.isLoggedIn ? '云端同步' : '大师设置'}
               </h3>
-              <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100">
-                <X size={20} />
+              <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-slate-600 p-2 -mr-2">
+                <X size={24} />
               </button>
             </div>
             
-            <div className="max-h-[80vh] overflow-y-auto no-scrollbar">
-                {/* Login Section */}
+            <div className="overflow-y-auto overflow-x-hidden no-scrollbar flex-1">
+                {/* Auth Section */}
                 <div className="p-6 bg-slate-50 border-b border-slate-100">
                     {!user.isLoggedIn ? (
-                        <div className="space-y-3">
-                            <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                                <User size={16} /> 会员登录 (同步云端 Key)
-                            </h4>
-                            <div className="flex gap-2">
-                                <input 
-                                    type="text" 
-                                    placeholder="用户名"
-                                    value={loginForm.username}
-                                    onChange={(e) => setLoginForm({...loginForm, username: e.target.value})}
-                                    className="flex-1 p-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-slate-400"
-                                />
-                                <input 
-                                    type="password" 
-                                    placeholder="密码"
-                                    value={loginForm.password}
-                                    onChange={(e) => setLoginForm({...loginForm, password: e.target.value})}
-                                    className="flex-1 p-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-slate-400"
-                                />
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between mb-2">
+                                <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                    <User size={16} /> 
+                                    {authMode === 'login' ? '会员登录' : '注册账号'}
+                                </h4>
+                                <button 
+                                    onClick={() => {
+                                        setAuthMode(authMode === 'login' ? 'register' : 'login');
+                                        setAuthMessage({text:'', type:''});
+                                    }}
+                                    className="text-xs text-amber-600 font-medium hover:underline"
+                                >
+                                    {authMode === 'login' ? '没有账号？去注册' : '已有账号？去登录'}
+                                </button>
                             </div>
-                             {loginMessage && <p className={`text-xs ${loginMessage.includes('失败') || loginMessage.includes('错误') ? 'text-red-500' : 'text-green-600'}`}>{loginMessage}</p>}
+                            
+                            <div className="flex flex-col gap-3">
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="text" 
+                                        placeholder="用户名"
+                                        value={authForm.username}
+                                        onChange={(e) => setAuthForm({...authForm, username: e.target.value})}
+                                        className="flex-1 p-3 text-sm border border-slate-200 rounded-lg outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-200 transition-all"
+                                    />
+                                </div>
+                                <div className="flex gap-2">
+                                     <input 
+                                        type="password" 
+                                        placeholder="密码"
+                                        value={authForm.password}
+                                        onChange={(e) => setAuthForm({...authForm, password: e.target.value})}
+                                        className="flex-1 p-3 text-sm border border-slate-200 rounded-lg outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-200 transition-all"
+                                    />
+                                </div>
+                            </div>
+                            
+                             {authMessage.text && (
+                                <div className={`text-xs p-2 rounded flex items-center gap-1.5 ${authMessage.type === 'error' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                                    <AlertCircle size={12} /> {authMessage.text}
+                                </div>
+                             )}
+
                             <button 
-                                onClick={handleLogin}
-                                disabled={isLoggingIn}
-                                className="w-full py-2 bg-slate-800 text-white text-sm rounded-lg hover:bg-slate-900 transition flex justify-center items-center gap-2"
+                                onClick={handleAuth}
+                                disabled={isAuthProcessing}
+                                className="w-full py-2.5 bg-white border border-slate-300 text-slate-700 text-sm font-bold rounded-lg hover:bg-slate-50 hover:border-slate-400 transition active:scale-[0.98] flex justify-center items-center gap-2 shadow-sm"
                             >
-                                {isLoggingIn ? <Loader2 size={14} className="animate-spin"/> : <LogIn size={14} />}
-                                {isLoggingIn ? '登录中...' : '登录并同步'}
+                                {isAuthProcessing ? <Loader2 size={16} className="animate-spin"/> : (authMode === 'login' ? <LogIn size={16} /> : <UserPlus size={16} />)}
+                                {isAuthProcessing ? '处理中...' : (authMode === 'login' ? '登录并同步 Key' : '立即注册')}
                             </button>
-                            <p className="text-[10px] text-slate-400 text-center">
-                                需要在 Cloudflare D1 数据库中预设账号
+                            <p className="text-[10px] text-slate-400 text-center leading-tight">
+                                登录后配置的 API Key 将加密保存至云端<br/>未登录状态下刷新页面 Key 将丢失
                             </p>
                         </div>
                     ) : (
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center text-slate-600 font-bold">
+                                <div className="w-12 h-12 bg-gradient-to-br from-amber-100 to-amber-200 rounded-full flex items-center justify-center text-amber-800 font-bold text-lg shadow-inner">
                                     {user.username.charAt(0).toUpperCase()}
                                 </div>
                                 <div>
-                                    <p className="text-sm font-bold text-slate-800">{user.username}</p>
-                                    <p className="text-xs text-green-600 flex items-center gap-1"><Check size={10}/> 云端已连接</p>
+                                    <p className="font-bold text-slate-800">{user.username}</p>
+                                    <p className="text-xs text-green-600 flex items-center gap-1 bg-green-50 px-1.5 py-0.5 rounded-full w-fit mt-1">
+                                        <Cloud size={10}/> 云端已连接
+                                    </p>
                                 </div>
                             </div>
                             <button 
                                 onClick={handleLogout}
-                                className="text-xs text-slate-500 hover:text-red-600 flex items-center gap-1 border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-white transition"
+                                className="text-xs text-slate-500 hover:text-red-600 flex items-center gap-1 border border-slate-200 px-3 py-2 rounded-lg hover:bg-white transition bg-white shadow-sm"
                             >
-                                <LogOut size={12} /> 退出
+                                <LogOut size={14} /> 退出
                             </button>
                         </div>
                     )}
                 </div>
 
                 <div className="p-6 space-y-6">
-                {/* Provider Selection */}
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-3">选择解卦模型</label>
-                    <div className="grid grid-cols-2 gap-3">
-                    <button 
-                        onClick={() => setProvider('gemini')}
-                        className={`flex flex-col items-center justify-center gap-1 py-3 px-2 rounded-xl border transition-all ${provider === 'gemini' ? 'bg-amber-50 border-amber-500 text-amber-900 ring-1 ring-amber-500 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}
-                    >
-                        <div className="flex items-center gap-1 font-bold">Google Gemini {provider === 'gemini' && <Check size={14} />}</div>
-                        <span className="text-[10px] opacity-70">速度快 · 免费额度高</span>
-                    </button>
-                    <button 
-                        onClick={() => setProvider('deepseek')}
-                        className={`flex flex-col items-center justify-center gap-1 py-3 px-2 rounded-xl border transition-all ${provider === 'deepseek' ? 'bg-indigo-50 border-indigo-500 text-indigo-900 ring-1 ring-indigo-500 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}
-                    >
-                        <div className="flex items-center gap-1 font-bold">DeepSeek {provider === 'deepseek' && <Check size={14} />}</div>
-                        <span className="text-[10px] opacity-70">中文理解极强 · 深度推理</span>
-                    </button>
-                    </div>
-                </div>
-
-                {/* API Keys */}
-                <div className="space-y-4">
-                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-xs text-slate-500">
-                    系统优先读取：1. 云端同步 2. 环境变量 3. 手动输入
-                    </div>
+                    {/* Provider Selection */}
                     <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
-                            Gemini API Key 
-                            {user.isLoggedIn && apiKeys.gemini && <span className="text-[10px] text-green-600 bg-green-50 px-1 rounded">已同步</span>}
-                        </label>
-                        <div className="relative">
-                            <input 
-                                type="password" 
-                                value={apiKeys.gemini}
-                                onChange={(e) => setApiKeys({...apiKeys, gemini: e.target.value})}
-                                placeholder="如未配置环境变量，请在此输入..."
-                                className="w-full p-3 pl-9 text-sm rounded-lg border border-slate-200 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
-                            />
-                            <KeyRound size={14} className="absolute left-3 top-3.5 text-slate-400"/>
+                        <label className="block text-sm font-bold text-slate-700 mb-3">选择解卦模型</label>
+                        <div className="grid grid-cols-2 gap-3">
+                        <button 
+                            onClick={() => setProvider('gemini')}
+                            className={`flex flex-col items-center justify-center gap-1 py-3 px-2 rounded-xl border transition-all relative ${provider === 'gemini' ? 'bg-amber-50 border-amber-500 text-amber-900 ring-1 ring-amber-500 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                        >
+                            <div className="flex items-center gap-1 font-bold">Google Gemini</div>
+                            <span className="text-[10px] opacity-70">速度快 · 免费</span>
+                            {provider === 'gemini' && <div className="absolute top-2 right-2 text-amber-600"><Check size={14} /></div>}
+                        </button>
+                        <button 
+                            onClick={() => setProvider('deepseek')}
+                            className={`flex flex-col items-center justify-center gap-1 py-3 px-2 rounded-xl border transition-all relative ${provider === 'deepseek' ? 'bg-indigo-50 border-indigo-500 text-indigo-900 ring-1 ring-indigo-500 shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                        >
+                            <div className="flex items-center gap-1 font-bold">DeepSeek</div>
+                            <span className="text-[10px] opacity-70">中文强 · 推理深</span>
+                            {provider === 'deepseek' && <div className="absolute top-2 right-2 text-indigo-600"><Check size={14} /></div>}
+                        </button>
                         </div>
                     </div>
-                    <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
-                            DeepSeek API Key
-                             {user.isLoggedIn && apiKeys.deepseek && <span className="text-[10px] text-green-600 bg-green-50 px-1 rounded">已同步</span>}
-                        </label>
-                        <div className="relative">
-                            <input 
-                                type="password" 
-                                value={apiKeys.deepseek}
-                                onChange={(e) => setApiKeys({...apiKeys, deepseek: e.target.value})}
-                                placeholder="sk-..."
-                                className="w-full p-3 pl-9 text-sm rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
-                            />
-                            <KeyRound size={14} className="absolute left-3 top-3.5 text-slate-400"/>
+
+                    {/* API Keys */}
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-xs font-medium text-slate-500 mb-1.5 flex items-center justify-between">
+                                <span>Gemini API Key</span>
+                                {user.isLoggedIn && apiKeys.gemini && <span className="text-[10px] text-green-600 bg-green-50 px-1.5 rounded flex items-center gap-1"><Check size={10}/> 已同步</span>}
+                            </label>
+                            <div className="relative">
+                                <input 
+                                    type="password" 
+                                    value={apiKeys.gemini}
+                                    onChange={(e) => setApiKeys({...apiKeys, gemini: e.target.value})}
+                                    placeholder="输入 Key..."
+                                    className="w-full p-3.5 pl-10 text-sm rounded-xl border border-slate-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-100 outline-none transition-all"
+                                />
+                                <KeyRound size={16} className="absolute left-3.5 top-3.5 text-slate-400"/>
+                            </div>
+                        </div>
+                        <div>
+                             <label className="block text-xs font-medium text-slate-500 mb-1.5 flex items-center justify-between">
+                                <span>DeepSeek API Key</span>
+                                {user.isLoggedIn && apiKeys.deepseek && <span className="text-[10px] text-green-600 bg-green-50 px-1.5 rounded flex items-center gap-1"><Check size={10}/> 已同步</span>}
+                            </label>
+                            <div className="relative">
+                                <input 
+                                    type="password" 
+                                    value={apiKeys.deepseek}
+                                    onChange={(e) => setApiKeys({...apiKeys, deepseek: e.target.value})}
+                                    placeholder="sk-..."
+                                    className="w-full p-3.5 pl-10 text-sm rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+                                />
+                                <KeyRound size={16} className="absolute left-3.5 top-3.5 text-slate-400"/>
+                            </div>
                         </div>
                     </div>
                 </div>
+            </div>
 
+            <div className="p-4 md:p-6 border-t border-slate-100 bg-white shrink-0 rounded-b-2xl">
                 <button 
                     onClick={saveSettings}
-                    className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition shadow-lg shadow-slate-200 active:scale-[0.98]"
+                    disabled={isSavingKeys}
+                    className="w-full py-3.5 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition shadow-lg shadow-slate-200 active:scale-[0.98] flex items-center justify-center gap-2 text-base"
                 >
-                    保存配置
+                    {isSavingKeys ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                    {user.isLoggedIn ? '保存并同步至云端' : '暂存 (刷新后失效)'}
                 </button>
-                </div>
             </div>
           </div>
         </div>
       )}
 
       {/* Input Section */}
-      <div className="bg-white p-5 md:p-8 rounded-2xl shadow-sm border border-slate-100 relative">
+      <div className="bg-white px-5 py-6 md:p-8 rounded-3xl shadow-sm border border-slate-100 relative">
         <button 
           onClick={() => setShowSettings(true)}
-          className="absolute top-5 right-5 text-slate-300 hover:text-slate-600 transition p-2 hover:bg-slate-50 rounded-full"
-          title="设置 API Key 与模型"
+          className="absolute top-4 right-4 md:top-6 md:right-6 text-slate-400 hover:text-slate-700 transition p-2.5 hover:bg-slate-50 rounded-full active:bg-slate-100"
+          title="设置"
         >
-          <Settings size={20} />
-          {user.isLoggedIn && <span className="absolute top-2 right-2 w-2 h-2 bg-green-500 rounded-full border border-white"></span>}
+          <Settings size={22} />
+          {user.isLoggedIn && <span className="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white"></span>}
         </button>
 
-        <h2 className="text-xl font-serif font-bold text-slate-800 mb-6 flex items-center gap-2">
-            <Sparkles size={18} className="text-amber-500"/>
+        <h2 className="text-xl md:text-2xl font-serif font-bold text-slate-800 mb-6 flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
+                <Sparkles size={16} className="text-amber-600"/>
+            </div>
             数字起卦
         </h2>
         
-        <div className="mb-6">
-            <label className="block text-sm font-medium text-slate-500 mb-2">心中所问之事</label>
+        <div className="mb-8">
+            <label className="block text-sm font-medium text-slate-500 mb-2 ml-1">心中所问之事</label>
             <input 
                 type="text" 
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
-                placeholder="例如：今日财运如何？"
-                className="w-full p-3 bg-slate-50 border-b-2 border-slate-200 focus:border-amber-500 outline-none transition-colors rounded-t-md text-base"
+                placeholder="例如：事业发展、今日运势..."
+                className="w-full p-4 bg-slate-50 border-b-2 border-slate-200 focus:border-amber-500 outline-none transition-colors rounded-t-xl text-base md:text-lg text-slate-800 placeholder:text-slate-400"
             />
         </div>
 
-        <div className="grid grid-cols-3 gap-3 md:gap-6 mb-8">
+        <div className="grid grid-cols-3 gap-3 md:gap-8 mb-8">
             {inputs.map((val, idx) => (
-                <div key={idx} className="flex flex-col gap-2">
-                    <label className="text-[10px] md:text-xs text-slate-400 text-center uppercase tracking-wider">数字 {idx + 1}</label>
+                <div key={idx} className="flex flex-col gap-2 relative group">
+                    <label className="text-[10px] md:text-xs text-slate-400 text-center uppercase tracking-wider font-bold">数 {idx + 1}</label>
                     <input 
                         type="number" 
                         value={val}
                         onChange={(e) => handleInputChange(idx, e.target.value)}
                         placeholder="0-999"
-                        className="text-center text-xl md:text-2xl font-serif p-3 md:p-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-100 focus:border-amber-400 outline-none transition-all placeholder:text-slate-200"
+                        className="text-center text-3xl md:text-4xl font-serif h-16 md:h-20 rounded-2xl border-2 border-slate-100 focus:border-amber-400 focus:bg-amber-50/30 outline-none transition-all placeholder:text-slate-200 text-slate-800 shadow-sm"
                     />
                 </div>
             ))}
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex gap-3 md:gap-4">
             <button 
                 onClick={handleCalculate}
-                className="flex-1 bg-slate-900 text-white py-3.5 rounded-xl font-bold hover:bg-slate-800 transition active:scale-[0.98] flex justify-center items-center gap-2 shadow-lg shadow-slate-200"
+                className="flex-1 bg-slate-900 text-white py-4 rounded-2xl font-bold text-base md:text-lg hover:bg-slate-800 transition active:scale-[0.98] flex justify-center items-center gap-2 shadow-xl shadow-slate-200/50"
             >
-                起卦 <ArrowRight size={18} />
+                起卦推演 <ArrowRight size={20} />
             </button>
              <button 
                 onClick={handleRandom}
-                className="px-5 py-3.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition active:scale-[0.98]"
-                title="随机数字"
+                className="px-5 md:px-6 py-4 rounded-2xl border-2 border-slate-100 text-slate-500 hover:bg-slate-50 hover:border-slate-200 hover:text-slate-700 transition active:scale-[0.96]"
+                title="随机生成"
             >
-                <RefreshCcw size={18} />
+                <RefreshCcw size={22} />
             </button>
         </div>
       </div>
 
       {/* Result Section */}
       {result && (
-        <div id="result-section" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 scroll-mt-24">
+        <div id="result-section" className="space-y-4 md:space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-700 scroll-mt-28">
             
             {/* Hexagram Display */}
-            <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-100">
-                <div className="flex flex-col md:flex-row justify-around items-center gap-8 md:gap-0">
+            <div className="bg-white p-5 md:p-8 rounded-3xl shadow-sm border border-slate-100">
+                <div className="flex flex-row justify-between md:justify-around items-center px-1 md:px-10">
                     <HexagramVisual 
                         hexagram={result.originalHexagram} 
-                        label="本卦 (开始)" 
+                        label="本卦" 
                         highlight={result.tiGua} 
                         movingLine={result.movingLine}
                     />
                     
-                    <div className="text-slate-300">
-                        <ArrowDown className="block md:hidden" size={24} />
-                        <ArrowRight className="hidden md:block" size={24} />
+                    <div className="text-slate-200 flex flex-col items-center gap-1">
+                        <ArrowRight className="hidden md:block" size={32} />
+                        <ArrowRight className="block md:hidden" size={24} />
+                        <span className="text-[10px] text-slate-400 md:hidden">变</span>
                     </div>
 
                     <HexagramVisual 
                         hexagram={result.changedHexagram} 
-                        label="变卦 (结果)" 
+                        label="变卦" 
                     />
                 </div>
             </div>
 
-            {/* Ancient Text (Original Annotations) */}
-            <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-[0.03] pointer-events-none">
-                    <ScrollText size={150} />
-                </div>
-                <h3 className="text-lg font-serif font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <ScrollText size={18} className="text-slate-500" />
-                    古籍原典
-                </h3>
-                
-                {result.originalHexagram.text ? (
-                    <div className="space-y-4">
-                        <div className="bg-[#fcfaf7] p-4 rounded-lg border-l-2 border-slate-300">
-                            <span className="text-xs text-slate-500 font-bold block mb-1">【本卦卦辞】</span>
-                            <p className="font-serif text-slate-700 text-base leading-relaxed">
-                                {result.originalHexagram.text.guaci}
-                            </p>
-                        </div>
-                        
-                        <div className="bg-[#fcfaf7] p-4 rounded-lg border-l-2 border-slate-300">
-                             <span className="text-xs text-slate-500 font-bold block mb-1">【大象传】</span>
-                            <p className="font-serif text-slate-700 text-base leading-relaxed">
-                                {result.originalHexagram.text.xiang}
-                            </p>
-                        </div>
-
-                        {result.movingLineText && (
-                           <div className="bg-[#fff5f5] p-4 rounded-lg border-l-2 border-cinnabar">
-                                <span className="text-xs text-cinnabar font-bold block mb-1">【动爻爻辞 · 变数所在】</span>
-                                <p className="font-serif text-slate-800 text-lg leading-relaxed font-medium">
-                                    {result.movingLineText}
-                                </p>
-                           </div>
-                        )}
-                    </div>
-                ) : (
-                    <div className="text-center py-8 text-slate-400 text-sm">
-                        <p>该卦象的原典数据暂未录入。</p>
-                        <p className="text-xs mt-1">（示例版本仅包含常用卦数据）</p>
-                    </div>
-                )}
-            </div>
-
             {/* Analysis Card */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-amber-500 overflow-hidden relative">
-                <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-                    <BrainCircuit size={120} />
+            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-l-4 border-amber-500 overflow-hidden relative">
+                <div className="absolute top-0 right-0 p-6 opacity-[0.04] pointer-events-none">
+                    <BrainCircuit size={160} />
                 </div>
-                <h3 className="text-lg font-serif font-bold text-slate-800 mb-4">体用分析</h3>
+                <div className="flex items-center gap-2 mb-5">
+                    <div className="w-1.5 h-5 bg-amber-500 rounded-full"></div>
+                    <h3 className="text-lg font-serif font-bold text-slate-800">体用分析</h3>
+                </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div className="p-4 bg-slate-50 rounded-xl flex items-center justify-between md:block">
-                        <span className="text-xs text-slate-500 block mb-1">体卦 (代表自己)</span>
-                        <div className="font-bold text-slate-800 text-lg flex items-baseline gap-2">
+                <div className="grid grid-cols-2 gap-3 md:gap-5 mb-5">
+                    <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100/50">
+                        <span className="text-[10px] md:text-xs text-slate-400 block mb-1 uppercase tracking-wide">体卦 (自己)</span>
+                        <div className="font-bold text-slate-800 text-base md:text-lg flex flex-col md:flex-row md:items-baseline gap-1 md:gap-2">
                             {result.tiGua === 'upper' ? result.originalHexagram.upper.name : result.originalHexagram.lower.name}
-                            <span className="text-xs px-2 py-0.5 bg-white border border-slate-200 rounded-full font-normal text-slate-500">
-                                五行属{result.tiGua === 'upper' ? result.originalHexagram.upper.element : result.originalHexagram.lower.element}
+                            <span className="text-[10px] w-fit px-2 py-0.5 bg-white border border-slate-200 rounded-full font-medium text-slate-500">
+                                属{result.tiGua === 'upper' ? result.originalHexagram.upper.element : result.originalHexagram.lower.element}
                             </span>
                         </div>
                     </div>
-                    <div className="p-4 bg-slate-50 rounded-xl flex items-center justify-between md:block">
-                        <span className="text-xs text-slate-500 block mb-1">用卦 (代表事物)</span>
-                        <div className="font-bold text-slate-800 text-lg flex items-baseline gap-2">
+                    <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100/50">
+                        <span className="text-[10px] md:text-xs text-slate-400 block mb-1 uppercase tracking-wide">用卦 (事物)</span>
+                        <div className="font-bold text-slate-800 text-base md:text-lg flex flex-col md:flex-row md:items-baseline gap-1 md:gap-2">
                             {result.yongGua === 'upper' ? result.originalHexagram.upper.name : result.originalHexagram.lower.name}
-                             <span className="text-xs px-2 py-0.5 bg-white border border-slate-200 rounded-full font-normal text-slate-500">
-                                五行属{result.yongGua === 'upper' ? result.originalHexagram.upper.element : result.originalHexagram.lower.element}
+                             <span className="text-[10px] w-fit px-2 py-0.5 bg-white border border-slate-200 rounded-full font-medium text-slate-500">
+                                属{result.yongGua === 'upper' ? result.originalHexagram.upper.element : result.originalHexagram.lower.element}
                             </span>
                         </div>
                     </div>
                 </div>
-                <div className="p-4 bg-amber-50 rounded-xl text-amber-900 mb-6 border border-amber-100/50">
-                    <span className="font-bold mr-2">关系判定:</span>
-                    {result.relation}
+                <div className={`p-4 rounded-2xl mb-6 border flex items-center gap-3 ${
+                    result.relationScore.includes('Auspicious') ? 'bg-amber-50 text-amber-900 border-amber-100' : 
+                    result.relationScore.includes('Bad') ? 'bg-stone-100 text-stone-700 border-stone-200' : 'bg-slate-50 text-slate-700 border-slate-100'
+                }`}>
+                    <div className={`w-2 h-2 rounded-full shrink-0 ${result.relationScore.includes('Auspicious') ? 'bg-amber-500' : 'bg-stone-400'}`}></div>
+                    <span className="font-bold text-sm md:text-base">{result.relation}</span>
                 </div>
 
                 {!aiInterpretation ? (
                     <button 
                         onClick={handleAskAI}
                         disabled={loadingAI}
-                        className={`w-full py-3.5 bg-gradient-to-r text-white rounded-xl font-bold text-sm tracking-wide shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${provider === 'deepseek' ? 'from-indigo-600 to-indigo-800 shadow-indigo-200' : 'from-slate-800 to-slate-900 shadow-slate-200'}`}
+                        className={`w-full py-4 bg-gradient-to-r text-white rounded-2xl font-bold text-sm md:text-base tracking-wide shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2.5 ${provider === 'deepseek' ? 'from-indigo-600 to-indigo-800 shadow-indigo-200' : 'from-slate-800 to-slate-900 shadow-slate-200'}`}
                     >
-                        {loadingAI ? '大师正在推演...' : `请 ${provider === 'deepseek' ? 'DeepSeek' : 'Gemini'} 大师详解`}
-                        {loadingAI && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>}
+                        {loadingAI ? '大师正在推演天机...' : `请 ${provider === 'deepseek' ? 'DeepSeek' : 'Gemini'} 大师详解`}
+                        {loadingAI && <Loader2 size={18} className="animate-spin text-white/80"/>}
                     </button>
                 ) : (
-                    <div className="mt-6 pt-6 border-t border-slate-100 animate-in fade-in duration-500">
-                        <h4 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
-                             <Sparkles size={16} className={provider === 'deepseek' ? 'text-indigo-500' : 'text-amber-500'}/> 
+                    <div className="mt-8 pt-6 border-t border-slate-100 animate-in fade-in duration-700">
+                        <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                             <div className={`p-1.5 rounded-lg ${provider === 'deepseek' ? 'bg-indigo-100 text-indigo-600' : 'bg-amber-100 text-amber-600'}`}>
+                                <Sparkles size={14}/> 
+                             </div>
                              {provider === 'deepseek' ? 'DeepSeek' : 'Gemini'} 大师解读
                         </h4>
-                        <div className="prose prose-slate prose-sm md:prose-base max-w-none text-slate-600 whitespace-pre-wrap leading-relaxed bg-slate-50/50 p-4 rounded-xl border border-slate-100">
+                        <div className="prose prose-slate prose-sm md:prose-base max-w-none text-slate-600 whitespace-pre-wrap leading-relaxed bg-slate-50 p-5 rounded-2xl border border-slate-100/80">
                             {aiInterpretation}
                         </div>
                         <div className="mt-4 flex justify-end">
                             <button 
                                 onClick={() => setAiInterpretation(null)}
-                                className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1 py-2 px-3 hover:bg-slate-50 rounded-lg transition-colors"
+                                className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1.5 py-2 px-3 hover:bg-slate-50 rounded-lg transition-colors"
                             >
                                 <RefreshCcw size={12}/> 重新解读
                             </button>
@@ -471,6 +557,49 @@ const DivinationTool: React.FC = () => {
                     </div>
                 )}
             </div>
+
+             {/* Ancient Text */}
+            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-6 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity pointer-events-none">
+                    <ScrollText size={140} />
+                </div>
+                <div className="flex items-center gap-2 mb-6">
+                    <div className="w-1.5 h-5 bg-slate-300 rounded-full"></div>
+                    <h3 className="text-lg font-serif font-bold text-slate-800">古籍原典</h3>
+                </div>
+                
+                {result.originalHexagram.text ? (
+                    <div className="space-y-4">
+                        <div className="bg-[#f9f8f6] p-4 rounded-xl border-l-[3px] border-slate-300">
+                            <span className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">本卦卦辞</span>
+                            <p className="font-serif text-slate-700 text-base leading-relaxed">
+                                {result.originalHexagram.text.guaci}
+                            </p>
+                        </div>
+                        
+                        <div className="bg-[#f9f8f6] p-4 rounded-xl border-l-[3px] border-slate-300">
+                             <span className="text-[10px] text-slate-400 font-bold block mb-1.5 uppercase tracking-wider">大象传</span>
+                            <p className="font-serif text-slate-700 text-base leading-relaxed">
+                                {result.originalHexagram.text.xiang}
+                            </p>
+                        </div>
+
+                        {result.movingLineText && (
+                           <div className="bg-red-50/50 p-4 rounded-xl border-l-[3px] border-cinnabar/60">
+                                <span className="text-[10px] text-cinnabar/80 font-bold block mb-1.5 uppercase tracking-wider">动爻 (变数)</span>
+                                <p className="font-serif text-slate-800 text-lg leading-relaxed font-medium">
+                                    {result.movingLineText}
+                                </p>
+                           </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="text-center py-8 text-slate-400 text-sm bg-slate-50 rounded-2xl">
+                        <p>该卦象的原典数据暂未录入</p>
+                    </div>
+                )}
+            </div>
+
         </div>
       )}
     </div>
