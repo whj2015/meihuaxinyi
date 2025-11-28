@@ -1,0 +1,11 @@
+{
+  "name": "meihua-mind",
+  "pages_build_output_dir": "dist",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "meihua-db",
+      "database_id": "e2316214-a1ee-479d-91dd-64b6f630ede5"
+    }
+  ]
+}
