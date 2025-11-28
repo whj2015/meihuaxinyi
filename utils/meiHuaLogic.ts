@@ -104,6 +104,9 @@ export const calculateDivination = (n1: number, n2: number, n3: number): Divinat
   // Fetch I Ching Text
   const ichingText = getIChingText(upperOriginal.id, lowerOriginal.id);
   const movingLineText = ichingText ? ichingText.lines[movingLine] : undefined;
+  
+  // Fetch Changed Hexagram Text (Newly Added)
+  const changedHexText = getIChingText(upperChanged.id, lowerChanged.id);
 
   return {
     inputNumbers: [n1, n2, n3],
@@ -119,6 +122,7 @@ export const calculateDivination = (n1: number, n2: number, n3: number): Divinat
       lower: lowerChanged,
       name: getHexagramName(upperChanged, lowerChanged),
       sequence: getHexagramSequence(upperChanged.id, lowerChanged.id),
+      text: changedHexText, // Inject text for changed hexagram
     },
     movingLine,
     tiGua,

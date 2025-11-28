@@ -4,7 +4,7 @@ import { calculateDivination } from '../utils/meiHuaLogic';
 import { DivinationResult, AIProvider, UserProfile, CustomAIConfig } from '../types';
 import HexagramVisual from './HexagramVisual';
 import { getInterpretation } from '../services/geminiService';
-import { Sparkles, ArrowRight, RefreshCcw, Settings, X, Check, User, LogOut, Gift, RotateCcw, Save, Loader2, Quote } from 'lucide-react';
+import { Sparkles, ArrowRight, RefreshCcw, Settings, X, Check, User, LogOut, Gift, RotateCcw, Save, Loader2, Quote, BookOpen } from 'lucide-react';
 
 // 升级版 Markdown 渲染器：支持标题、列表、段落
 const FormattedMarkdown: React.FC<{ text: string }> = ({ text }) => {
@@ -75,7 +75,7 @@ const DivinationTool: React.FC = () => {
   const [aiInterpretation, setAiInterpretation] = useState<string | null>(null);
 
   const [showSettings, setShowSettings] = useState(false);
-  // Default provider is now deepseek
+  // Default provider is deepseek
   const [provider, setProvider] = useState<AIProvider>('deepseek');
   
   // Local Keys (Guest Only)
@@ -172,8 +172,6 @@ const DivinationTool: React.FC = () => {
         setIsSavingKeys(true);
         try {
             // Key is sent via Header, encoded to prevent body logging
-            // Note: In real production, use HTTPS + Backend Proxy (implemented)
-            // Here we send Base64 in header as a simple obfuscation layer before reaching our backend
             const encodeKey = (k: string) => k ? btoa(encodeURIComponent(k)) : "";
             
             const response = await fetch('/api/update-keys', {
@@ -417,11 +415,53 @@ const DivinationTool: React.FC = () => {
 
       {result && (
         <div id="result-section" className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 scroll-mt-24">
-            {/* Hexagram Cards - Stack on mobile, row on desktop */}
+            {/* Hexagram Cards */}
             <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col md:flex-row items-center justify-around gap-6 md:gap-0">
                 <HexagramVisual hexagram={result.originalHexagram} label="本卦" highlight={result.tiGua} movingLine={result.movingLine}/>
                 <div className="rotate-90 md:rotate-0 text-slate-200"><ArrowRight size={24}/></div>
                 <HexagramVisual hexagram={result.changedHexagram} label="变卦"/>
+            </div>
+
+            {/* Ancient Text Diagnosis Card (NEW) */}
+            <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
+                <h3 className="font-serif font-bold text-slate-800 mb-4 flex items-center gap-2 pb-2 border-b border-slate-50">
+                    <BookOpen size={18} className="text-amber-600"/> 
+                    古籍断语
+                </h3>
+                <div className="space-y-4 text-sm font-serif leading-relaxed">
+                    {/* Original Hexagram Text */}
+                    <div>
+                        <div className="font-bold text-slate-800 mb-1 flex items-baseline gap-2">
+                             【本卦】{result.originalHexagram.name}
+                        </div>
+                        <div className="text-slate-600 bg-slate-50 p-2 rounded-lg">
+                            {result.originalHexagram.text?.guaci || "暂无卦辞"}
+                        </div>
+                    </div>
+
+                    {/* Moving Line (Highlight) */}
+                    <div className="bg-amber-50 p-3 rounded-xl border border-amber-100 text-amber-900 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-1 bg-amber-200 text-[9px] font-bold text-amber-800 rounded-bl-lg">动爻</div>
+                        <div className="font-bold mb-1">【关键变数】</div>
+                        <div className="text-base font-medium">{result.movingLineText || "无动爻"}</div>
+                        <div className="text-[10px] text-amber-700/60 mt-1.5 pt-1.5 border-t border-amber-200/50">
+                            此爻为事态变化之机，吉凶悔吝皆由此生。
+                        </div>
+                    </div>
+
+                    {/* Changed Hexagram Text */}
+                    <div>
+                         <div className="font-bold text-slate-800 mb-1 flex items-baseline gap-2">
+                             【变卦】{result.changedHexagram.name}
+                        </div>
+                        <div className="text-slate-600 bg-slate-50 p-2 rounded-lg">
+                            {result.changedHexagram.text?.guaci || "暂无卦辞"}
+                        </div>
+                         <div className="text-[10px] text-slate-400 mt-1 text-right">
+                            （代表事情的最终走向或结果）
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* AI Analysis Card */}
