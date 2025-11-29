@@ -15,7 +15,6 @@ export async function onRequestPost(context) {
 
     let finalApiKey = apiKey;
     let finalProvider = provider || 'deepseek';
-    let deductCredits = false;
     let currentUser = null;
 
     // --- 1. 鉴权与身份识别 ---
@@ -55,31 +54,27 @@ export async function onRequestPost(context) {
             const credits = currentUser.credits || 0;
             if (credits > 0) {
                 // 预扣费逻辑：原子化扣减，确保不超扣
-                // D1 的 UPDATE ... RETURNING 不一定所有驱动都支持，这里使用更稳妥的 check-and-update
-                // 但为了并发安全，最好是一条 SQL
                 const deductRes = await env.DB.prepare("UPDATE users SET credits = credits - 1 WHERE username = ? AND credits > 0").bind(currentUser.username).run();
                 
                 if (deductRes.meta.changes > 0) {
-                    // 扣费成功，获取管理员 Key
-                    deductCredits = true; // 标记已扣费（用于日志，实际上已在 DB 扣除）
-                    
-                    const admin = await env.DB.prepare("SELECT gemini_key, deepseek_key FROM users WHERE id = 1").first();
-                    // 这里假设管理员的 Key 也是加密存储的，需要解密
-                    // 如果管理员是在旧版本创建的，可能是明文。尝试解密，失败则认为是明文。
-                    let adminDsKey = admin?.deepseek_key;
-                    let adminGemKey = admin?.gemini_key;
-                    
-                    if (env.DATA_SECRET) {
-                        const d1 = await decryptData(adminDsKey, env.DATA_SECRET);
-                        if (d1) adminDsKey = d1; 
-                        const d2 = await decryptData(adminGemKey, env.DATA_SECRET);
-                        if (d2) adminGemKey = d2;
-                    }
+                    // 扣费成功，读取环境变量中的系统默认 Key
+                    const sysDeepseek = env.DEFAULT_DEEPSEEK_KEY;
+                    const sysGemini = env.DEFAULT_GEMINI_KEY;
 
-                    if (finalProvider === 'deepseek' && adminDsKey) finalApiKey = adminDsKey;
-                    else if (finalProvider === 'gemini' && adminGemKey) finalApiKey = adminGemKey;
-                    else if (adminDsKey) { finalProvider = 'deepseek'; finalApiKey = adminDsKey; }
-                    else if (adminGemKey) { finalProvider = 'gemini'; finalApiKey = adminGemKey; }
+                    // 智能匹配系统 Key
+                    if (finalProvider === 'deepseek' && sysDeepseek) {
+                        finalApiKey = sysDeepseek;
+                    } else if (finalProvider === 'gemini' && sysGemini) {
+                        finalApiKey = sysGemini;
+                    } else if (sysDeepseek) {
+                        // 用户选了 Gemini 但系统没配置 Gemini Key，回退到 DeepSeek
+                        finalProvider = 'deepseek';
+                        finalApiKey = sysDeepseek;
+                    } else if (sysGemini) {
+                        // 用户选了 DeepSeek 但系统没配置 DeepSeek Key，回退到 Gemini
+                        finalProvider = 'gemini';
+                        finalApiKey = sysGemini;
+                    }
                 } else {
                      return new Response(JSON.stringify({ error: "灵力点数不足" }), { status: 402 });
                 }
@@ -90,8 +85,7 @@ export async function onRequestPost(context) {
     }
 
     if (!finalApiKey && finalProvider !== 'custom') {
-      // 如果已预扣费但没找到 Key (极罕见)，理应退款，但此处简化处理报错
-      return new Response(JSON.stringify({ error: "未配置 API Key 且系统 Key 不可用" }), { status: 400 });
+      return new Response(JSON.stringify({ error: "未配置 API Key 且系统默认服务暂不可用" }), { status: 400 });
     }
 
     // --- 3. 发起请求 ---
