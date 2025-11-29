@@ -1,5 +1,5 @@
 
-import { verifyJwt } from '../lib/security';
+import { verifyJwt } from '../../lib/security';
 
 export async function onRequestPost(context) {
   const { request, env } = context;
