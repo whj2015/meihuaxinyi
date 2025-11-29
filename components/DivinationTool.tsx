@@ -4,7 +4,7 @@ import { calculateDivination } from '../utils/meiHuaLogic';
 import { DivinationResult, AIProvider, UserProfile, CustomAIConfig, HistoryRecord } from '../types';
 import HexagramVisual from './HexagramVisual';
 import { getInterpretation } from '../services/geminiService';
-import { Sparkles, ArrowRight, RefreshCcw, Settings, X, Check, User, LogOut, Gift, RotateCcw, Save, Loader2, Quote, BookOpen, Activity, UserCircle, Briefcase, GitCommit, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, MoveHorizontal, MessageCircle, Hash, History, Clock, CreditCard, Trash2, AlertTriangle, Eraser } from 'lucide-react';
+import { Sparkles, ArrowRight, RefreshCcw, Settings, X, Check, User, LogOut, Gift, RotateCcw, Save, Loader2, Quote, BookOpen, Activity, UserCircle, Briefcase, GitCommit, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, MoveHorizontal, MessageCircle, Hash, History, Clock, CreditCard, Trash2, AlertTriangle } from 'lucide-react';
 
 // --- Markdown Renderer ---
 const FormattedMarkdown: React.FC<{ text: string }> = ({ text }) => {
@@ -379,18 +379,16 @@ const DivinationTool: React.FC = () => {
   };
 
   const handleRandom = () => {
-    setInputs(['', '', '']);
+    // 直接生成并设置，消除中间的清空状态导致的闪烁
+    const n1 = Math.floor(Math.random() * 800) + 100;
+    const n2 = Math.floor(Math.random() * 800) + 100;
+    const n3 = Math.floor(Math.random() * 800) + 100;
+    
+    setInputs([n1.toString(), n2.toString(), n3.toString()]);
     setQuestion('');
     setResult(null);
     setAiInterpretation(null);
     setCurrentRecordId(null);
-    // Slight delay to allow UI to clear before setting new randoms
-    setTimeout(() => {
-        const n1 = Math.floor(Math.random() * 800) + 100;
-        const n2 = Math.floor(Math.random() * 800) + 100;
-        const n3 = Math.floor(Math.random() * 800) + 100;
-        setInputs([n1.toString(), n2.toString(), n3.toString()]);
-    }, 50);
   };
 
   const handleCalculate = async () => {
@@ -653,7 +651,6 @@ const DivinationTool: React.FC = () => {
                 ))}
             </div>
             <div className="flex gap-4 pt-4 border-t border-slate-100/50">
-                <button onClick={handleReset} className="w-14 h-14 md:h-16 flex items-center justify-center rounded-2xl border border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600 active:scale-95 transition-all" title="清空重置"><Eraser size={20}/></button>
                 <button onClick={handleRandom} className="w-14 h-14 md:h-16 flex items-center justify-center rounded-2xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 active:scale-95 transition-all" title="随机生成"><RefreshCcw size={22}/></button>
                 <button onClick={handleCalculate} className="flex-1 h-14 md:h-16 bg-slate-900 text-white rounded-2xl font-bold text-lg shadow-xl shadow-slate-200 hover:shadow-2xl hover:-translate-y-0.5 active:scale-[0.98] transition-all flex justify-center items-center gap-3">开始起卦 <ArrowRight size={20} className="opacity-80"/></button>
             </div>
