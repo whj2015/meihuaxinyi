@@ -73,17 +73,31 @@ const buildPrompt = (divination: DivinationResult, userQuestion: string): string
 
 /**
  * 统一代理调用函数
- * 所有请求都发往 /api/ai-proxy，由后端 Worker 负责鉴权和发起真实请求
+ * 所有请求都发往 /api/ai-proxy
  */
 const callProxyStream = async (
   payload: any, 
   token: string | undefined,
+  guestKey: string | undefined, // NEW: Receive Guest Key
+  provider: AIProvider,
   onStreamUpdate: (text: string) => void
 ): Promise<string> => {
   try {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    
+    // 1. User Token
     if (token) {
         headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    // 2. Guest Key via Headers (Base64 Encoded)
+    if (guestKey && !token) {
+        const encodedKey = btoa(encodeURIComponent(guestKey));
+        if (provider === 'gemini') {
+            headers['x-gemini-token'] = encodedKey;
+        } else if (provider === 'deepseek') {
+            headers['x-deepseek-token'] = encodedKey;
+        }
     }
 
     const response = await fetch('/api/ai-proxy', {
@@ -102,7 +116,6 @@ const callProxyStream = async (
     const reader = response.body.getReader();
     const decoder = new TextDecoder("utf-8");
     let fullText = "";
-    
     let buffer = "";
 
     while (true) {
@@ -112,7 +125,6 @@ const callProxyStream = async (
       buffer += chunk;
 
       if (payload.provider === 'gemini') {
-         // 简单处理 Gemini REST 流
          const parts = chunk.split(/["']text["']\s*:\s*["']((?:[^"'\\]|\\.)*)["']/g);
          for (let i = 1; i < parts.length; i += 2) {
              let t = parts[i];
@@ -137,7 +149,7 @@ const callProxyStream = async (
                         onStreamUpdate(fullText);
                     }
                 } catch (e) {
-                    // ignore parse error
+                    // ignore
                 }
             }
          }
@@ -160,8 +172,8 @@ export const getInterpretation = async (
   userQuestion: string,
   provider: AIProvider,
   config: { 
-    token?: string; // JWT Token for user
-    apiKey?: string; // Guest Key
+    token?: string; 
+    apiKey?: string; 
     customConfig?: CustomAIConfig 
   },
   onStreamUpdate: (text: string) => void
@@ -173,12 +185,11 @@ export const getInterpretation = async (
     const payload: any = {
         provider,
         prompt,
-        // username 已废弃，通过 token 鉴权
-        apiKey: config.apiKey, 
+        // apiKey: config.apiKey, // REMOVED from Body
         customConfig: config.customConfig
     };
 
-    const result = await callProxyStream(payload, config.token, onStreamUpdate);
+    const result = await callProxyStream(payload, config.token, config.apiKey, provider, onStreamUpdate);
     return result;
   } catch (error: any) {
     const errMsg = `解读中断：${error.message || '网络连接失败'}`;

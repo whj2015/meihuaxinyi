@@ -6,18 +6,29 @@ export async function onRequestPost(context) {
 
   try {
     const { 
-      // username, // 废弃：不再信任 Body 中的 username
-      apiKey,         
+      // apiKey, // REMOVED: Guest Key no longer in body
       provider,       
       prompt,
       customConfig 
     } = await request.json();
 
-    let finalApiKey = apiKey;
     let finalProvider = provider || 'deepseek';
     let currentUser = null;
+    let finalApiKey = null;
 
-    // --- 1. 鉴权与身份识别 ---
+    // --- 1. 获取 Headers 中的访客 Key ---
+    const geminiHeader = request.headers.get("x-gemini-token");
+    const deepseekHeader = request.headers.get("x-deepseek-token");
+
+    const decodeKey = (encodedStr) => {
+        if (!encodedStr) return null;
+        try { return decodeURIComponent(atob(encodedStr)); } catch (e) { return null; }
+    };
+
+    if (finalProvider === 'gemini') finalApiKey = decodeKey(geminiHeader);
+    if (finalProvider === 'deepseek') finalApiKey = decodeKey(deepseekHeader);
+
+    // --- 2. 鉴权与身份识别 (User Token) ---
     const authHeader = request.headers.get("Authorization");
     if (authHeader && authHeader.startsWith("Bearer ")) {
        const token = authHeader.split(" ")[1];
@@ -30,48 +41,49 @@ export async function onRequestPost(context) {
        }
     }
 
-    // --- 2. Key 策略与扣费判定 ---
+    // --- 3. Key 策略与扣费判定 ---
+    let creditsDeducted = false;
+
     if (currentUser) {
-        // 解密用户存储的 Key
-        let userGeminiKey = null;
-        let userDeepseekKey = null;
-        
-        if (env.DATA_SECRET) {
-            userGeminiKey = await decryptData(currentUser.gemini_key, env.DATA_SECRET);
-            userDeepseekKey = await decryptData(currentUser.deepseek_key, env.DATA_SECRET);
-        } else {
-            // 回退兼容（如果未开启加密）
-            userGeminiKey = currentUser.gemini_key;
-            userDeepseekKey = currentUser.deepseek_key;
+        // 如果 Header 没传 Key，尝试用数据库存的 Key
+        if (!finalApiKey) {
+            let userGeminiKey = null;
+            let userDeepseekKey = null;
+            
+            if (env.DATA_SECRET) {
+                userGeminiKey = await decryptData(currentUser.gemini_key, env.DATA_SECRET);
+                userDeepseekKey = await decryptData(currentUser.deepseek_key, env.DATA_SECRET);
+            } else {
+                // 回退兼容
+                userGeminiKey = currentUser.gemini_key;
+                userDeepseekKey = currentUser.deepseek_key;
+            }
+
+            if (finalProvider === 'gemini' && userGeminiKey) finalApiKey = userGeminiKey;
+            else if (finalProvider === 'deepseek' && userDeepseekKey) finalApiKey = userDeepseekKey;
         }
 
-        // 优先使用用户的 Key
-        if (finalProvider === 'gemini' && userGeminiKey) finalApiKey = userGeminiKey;
-        else if (finalProvider === 'deepseek' && userDeepseekKey) finalApiKey = userDeepseekKey;
-
-        // 如果用户没 Key，尝试使用系统免费额度
+        // 如果还是没 Key，尝试扣费使用系统 Key
         if (!finalApiKey && finalProvider !== 'custom') {
             const credits = currentUser.credits || 0;
             if (credits > 0) {
-                // 预扣费逻辑：原子化扣减，确保不超扣
+                // 预扣费
                 const deductRes = await env.DB.prepare("UPDATE users SET credits = credits - 1 WHERE username = ? AND credits > 0").bind(currentUser.username).run();
                 
                 if (deductRes.meta.changes > 0) {
-                    // 扣费成功，读取环境变量中的系统默认 Key
+                    creditsDeducted = true; // 标记已扣费
+                    
                     const sysDeepseek = env.DEFAULT_DEEPSEEK_KEY;
                     const sysGemini = env.DEFAULT_GEMINI_KEY;
 
-                    // 智能匹配系统 Key
                     if (finalProvider === 'deepseek' && sysDeepseek) {
                         finalApiKey = sysDeepseek;
                     } else if (finalProvider === 'gemini' && sysGemini) {
                         finalApiKey = sysGemini;
                     } else if (sysDeepseek) {
-                        // 用户选了 Gemini 但系统没配置 Gemini Key，回退到 DeepSeek
                         finalProvider = 'deepseek';
                         finalApiKey = sysDeepseek;
                     } else if (sysGemini) {
-                        // 用户选了 DeepSeek 但系统没配置 DeepSeek Key，回退到 Gemini
                         finalProvider = 'gemini';
                         finalApiKey = sysGemini;
                     }
@@ -85,10 +97,14 @@ export async function onRequestPost(context) {
     }
 
     if (!finalApiKey && finalProvider !== 'custom') {
+      // 如果已扣费但没找到Key，退款
+      if (creditsDeducted) {
+          await env.DB.prepare("UPDATE users SET credits = credits + 1 WHERE username = ?").bind(currentUser.username).run();
+      }
       return new Response(JSON.stringify({ error: "未配置 API Key 且系统默认服务暂不可用" }), { status: 400 });
     }
 
-    // --- 3. 发起请求 ---
+    // --- 4. 发起请求 ---
     let apiUrl = "";
     let requestBody = {};
     let headers = { "Content-Type": "application/json" };
@@ -135,6 +151,10 @@ export async function onRequestPost(context) {
     });
 
     if (!upstreamResponse.ok) {
+        // 请求失败，执行退款
+        if (creditsDeducted) {
+            await env.DB.prepare("UPDATE users SET credits = credits + 1 WHERE username = ?").bind(currentUser.username).run();
+        }
         const errText = await upstreamResponse.text();
         return new Response(JSON.stringify({ error: `AI 服务错误: ${upstreamResponse.status}`, details: errText }), { status: upstreamResponse.status });
     }
@@ -151,6 +171,8 @@ export async function onRequestPost(context) {
 
   } catch (err) {
     console.error(err);
+    // 捕获异常，尝试退款（如果是扣费用户）
+    // 注意：如果是流式传输中断，可能无法在此处捕获
     return new Response(JSON.stringify({ error: "Proxy Error: " + err.message }), { status: 500 });
   }
 }

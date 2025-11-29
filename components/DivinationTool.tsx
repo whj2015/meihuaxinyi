@@ -389,7 +389,6 @@ const DivinationTool: React.FC = () => {
             customConfig
         },
         (text) => {
-            // FIX: 接收到的 text 已经是全量文本，直接覆盖状态，而不是追加
             setAiInterpretation(text); 
         }
     ).then((finalText) => {
@@ -600,7 +599,7 @@ const DivinationTool: React.FC = () => {
                         <div className="text-center text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center justify-center gap-1"><Hash size={12}/> {numLabels[idx]}</div>
                         <div className="relative group">
                             <div className="absolute top-2 left-2 text-[10px] text-slate-300 font-mono pointer-events-none">#{idx+1}</div>
-                            <input type="number" value={val} onChange={e=>handleInputChange(idx,e.target.value)} className="w-full text-center text-3xl md:text-4xl font-serif h-20 md:h-24 rounded-2xl border-2 border-slate-100 bg-slate-50/50 focus:bg-white focus:border-amber-400 focus:ring-4 focus:ring-amber-50 outline-none transition-all placeholder:text-slate-200 text-slate-800" placeholder="0-999"/>
+                            <input inputMode="numeric" type="number" value={val} onChange={e=>handleInputChange(idx,e.target.value)} className="w-full text-center text-3xl md:text-4xl font-serif h-20 md:h-24 rounded-2xl border-2 border-slate-100 bg-slate-50/50 focus:bg-white focus:border-amber-400 focus:ring-4 focus:ring-amber-50 outline-none transition-all placeholder:text-slate-200 text-slate-800" placeholder="0-999"/>
                         </div>
                     </div>
                 ))}
