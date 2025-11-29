@@ -2,43 +2,72 @@
 import { DivinationResult, AIProvider, CustomAIConfig } from "../types";
 
 /**
- * 构建提示词 (优化版：结构化输出 + 互卦分析 + 中立客观)
+ * 构建提示词 (发散性思维版：取象比类 + 场景映射)
  */
 const buildPrompt = (divination: DivinationResult, userQuestion: string): string => {
   const { originalHexagram, changedHexagram, huHexagram, relation, relationScore, tiGua, yongGua, movingLineText } = divination;
   
+  // 提取更细节的象数信息
+  const up = originalHexagram.upper;
+  const lo = originalHexagram.lower;
+  
+  // 确定体用卦的具体属性
+  const tiTrigram = tiGua === 'upper' ? up : lo;
+  const yongTrigram = yongGua === 'upper' ? up : lo;
+
+  const tiDesc = `${tiTrigram.name}(${tiTrigram.nature}/${tiTrigram.element})`;
+  const yongDesc = `${yongTrigram.name}(${yongTrigram.nature}/${yongTrigram.element})`;
+
+  // 默认问题处理
+  const question = userQuestion && userQuestion.trim() !== "" ? userQuestion : "综合运势（未指定具体事项）";
+
   return `
-    你是一位精通《梅花易数》的国学大师，你的解卦风格是：**中立客观、逻辑严密、不欺人、不媚俗**。
-    请根据以下卦象数据，为求测者提供一份真实、理性的解读。
+    你是一位**精通梅花易数、善于“取象比类”的国学大师**。
+    求测者正在询问：**【 ${question} 】**。
 
-    【核心数据】
-    - 问事：${userQuestion || "综合运势"}
-    - 卦象演变：本卦【${originalHexagram.name}】 -> 互卦【${huHexagram.name}】(过程) -> 变卦【${changedHexagram.name}】(结果)
-    - 核心关系：${relation} (${relationScore})
-    - 关键动爻：${movingLineText || "无"}
+    请不要照本宣科地翻译卦辞，你需要**结合具体问题**，通过卦象的自然属性（万物类象）进行发散性推理。
 
-    【解读原则】
-    1. **保持中立**：请务必基于五行生克和卦义实话实说。好就是好，坏就是坏。不要只报喜不报忧，也不要故意吓唬用户。
-    2. **重视过程**：请特别关注“互卦”，它揭示了事情内部的隐情、中间的波折或潜在的因果链条。
-    3. **拒绝迷信**：分析要结合现实逻辑，提供具有操作性的建议。
+    === 卦象数据 ===
+    1. **本卦（现状）**：${originalHexagram.name} 
+       - 构成：上${up.name}(${up.nature}/${up.element}) / 下${lo.name}(${lo.nature}/${lo.element})
+       - **体卦（代表求测者）**：${tiDesc}
+       - **用卦（代表所测事）**：${yongDesc}
+       - **能量关系**：${relation} (${relationScore})
+    
+    2. **互卦（隐情/过程）**：${huHexagram.name}
+       - 提示：这是事情内部的潜伏因素，或中间的发展过程。
+    
+    3. **变卦（结局）**：${changedHexagram.name}
+       - 动爻：${movingLineText || "无"}
+       - 提示：这是在动爻引发变化后的最终趋势。
 
-    【输出格式】
-    请严格按照以下 Markdown 格式输出（不要使用代码块）：
+    === 解读要求（非常重要） ===
+    1. **发散性思维（取象比类）**：
+       - 必须将八卦的自然象征（如巽为风、为入、为生意、为长女；离为火、为虚、为文书、为美丽）**映射到用户所问的具体领域**。
+       - 例如：问生意，"震"可能代表启动迅速或名声大；问感情，"震"可能代表争吵或一见钟情。请根据具体问题发挥想象力。
+    2. **体用深度分析**：
+       - 不要只说"吉"或"凶"。解释"为什么"。例如：体克用，是"我辛苦掌控局面"；用生体，是"坐享其成，有贵人助"。
+       - 结合五行生克（${yongTrigram.element} 与 ${tiTrigram.element}）来描述现实中的互动模式。
+    3. **逻辑连贯**：
+       - 按照 现状(本) -> 隐情(互) -> 结局(变) 的时间轴叙述故事。
 
-    ### 🎯 核心断语
-    （用一句话直断吉凶。例如：“此事先难后易，最终可成”或“目前时机未到，强求有悔”。）
+    === 输出格式 (Markdown) ===
+    请严格按照以下格式输出：
 
-    ### 🔍 深度解析
-    - **现状（本卦）**：...
-    - **过程（互卦）**：基于【${huHexagram.name}】，分析事情发展的中间环节、潜在阻力或内部隐情。
-    - **结局（变卦）**：...
+    ### 🎯 核心直断
+    （一针见血的结论，结合问题定吉凶。不用太长。）
 
-    ### 💡 关键转折
-    （基于动爻“${movingLineText}”进行分析，说明这一变数如何影响全局。）
+    ### 🖼️ 象意推演
+    - **卦象拆解**：(结合八卦的自然属性，解释为什么这个卦对应用户的问题。例如："上乾为天，下风为姤，天风姤象征...")
+    - **体用博弈**：(详细解释体卦与用卦的五行生克在现实中代表什么情形。)
 
-    ### 🚀 大师忠告
-    - （建议1：客观的行动指南）
-    - （建议2：心态或策略调整）
+    ### 🌊 局势演变
+    - **当前**：(本卦分析)
+    - **过程**：(互卦分析，指出潜在的阻碍或转机)
+    - **结果**：(变卦分析，结合动爻辞)
+
+    ### 💡 大师忠告
+    （针对${question}的具体建议，理性和玄学结合）
   `;
 };
 
