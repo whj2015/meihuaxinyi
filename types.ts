@@ -75,8 +75,8 @@ export interface AISettings {
 export interface UserProfile {
   username: string;
   isLoggedIn: boolean;
-  token?: string;
-  credits?: number; // 剩余灵力/点数 (取代 usageCount)
+  token?: string; // JWT Token
+  credits?: number; // 剩余灵力/点数
 }
 
 export interface HistoryRecord {

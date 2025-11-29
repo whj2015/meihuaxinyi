@@ -1,69 +1,73 @@
 
+import { verifyJwt, encryptData } from '../lib/security';
+
 export async function onRequestPost(context) {
   const { request, env } = context;
 
   try {
-    // 1. 从 Body 读取认证信息
-    const { username, password } = await request.json();
+    // 1. JWT 鉴权
+    const authHeader = request.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ success: false, message: "未授权" }), { status: 401 });
+    }
+    const token = authHeader.split(" ")[1];
+    const payload = await verifyJwt(token, env.JWT_SECRET);
+    if (!payload) {
+      return new Response(JSON.stringify({ success: false, message: "Token 无效或过期" }), { status: 401 });
+    }
+    const username = payload.username;
 
-    // 2. 从 Headers 读取加密的 Key (Base64编码)
-    // 前端使用 btoa(encodeURIComponent(key)) 编码
+    // 2. 获取 Headers 中的 Key (前端已 Base64 编码，防止 Body 泄露)
     const geminiHeader = request.headers.get("x-gemini-token");
     const deepseekHeader = request.headers.get("x-deepseek-token");
 
-    // 解码辅助函数
     const decodeKey = (encodedStr) => {
       if (!encodedStr) return null;
-      try {
-        return decodeURIComponent(atob(encodedStr));
-      } catch (e) {
-        return null;
-      }
+      try { return decodeURIComponent(atob(encodedStr)); } catch (e) { return null; }
     };
 
     const newGeminiKey = decodeKey(geminiHeader);
     const newDeepseekKey = decodeKey(deepseekHeader);
 
-    if (!username || !password) {
-      return new Response(JSON.stringify({ success: false, message: "请输入您的API KEY后保存，未输入只能免费解卦5次。" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
+    // 3. 获取旧的加密数据
+    const currentUser = await env.DB.prepare("SELECT gemini_key, deepseek_key FROM users WHERE username = ?").bind(username).first();
+    if (!currentUser) return new Response(JSON.stringify({ success: false, message: "用户不存在" }), { status: 404 });
 
-    // 3. 验证密码并获取当前 Key
-    const currentUser = await env.DB.prepare("SELECT password, gemini_key, deepseek_key FROM users WHERE username = ?").bind(username).first();
+    // 4. 服务端加密存储 (如果用户传了新 Key)
+    // 如果用户传了新 Key，加密后存入；如果没传，保持原样
+    // 注意：encryptData 返回 JSON 字符串 { iv, data }
     
-    if (!currentUser || currentUser.password !== password) {
-      return new Response(JSON.stringify({ success: false, message: "密码错误" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
+    let finalGeminiEncrypted = currentUser.gemini_key;
+    let finalDeepseekEncrypted = currentUser.deepseek_key;
 
-    // 4. 智能合并：只有当前端提供了非空的新 Key 时才更新，否则保留旧值
-    // 这样用户在前端留空点击保存时，不会意外清除云端的 Key
-    const finalGeminiKey = (newGeminiKey && newGeminiKey.trim() !== "") ? newGeminiKey : currentUser.gemini_key;
-    const finalDeepseekKey = (newDeepseekKey && newDeepseekKey.trim() !== "") ? newDeepseekKey : currentUser.deepseek_key;
+    if (env.DATA_SECRET) {
+        if (newGeminiKey && newGeminiKey.trim() !== "") {
+            finalGeminiEncrypted = await encryptData(newGeminiKey, env.DATA_SECRET);
+        }
+        if (newDeepseekKey && newDeepseekKey.trim() !== "") {
+            finalDeepseekEncrypted = await encryptData(newDeepseekKey, env.DATA_SECRET);
+        }
+    } else {
+        // 如果没有配置 DATA_SECRET，则不安全地存储（降级处理，不推荐）
+        // 建议必须配置 DATA_SECRET
+        console.warn("DATA_SECRET missing, storing plaintext (unsafe)");
+        if (newGeminiKey) finalGeminiEncrypted = newGeminiKey;
+        if (newDeepseekKey) finalDeepseekEncrypted = newDeepseekKey;
+    }
 
     // 5. 更新数据库
     const result = await env.DB.prepare(
       "UPDATE users SET gemini_key = ?, deepseek_key = ? WHERE username = ?"
-    ).bind(finalGeminiKey, finalDeepseekKey, username).run();
+    ).bind(finalGeminiEncrypted, finalDeepseekEncrypted, username).run();
 
     if (result.success) {
-      return new Response(JSON.stringify({ success: true, message: "配置已同步" }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
+      return new Response(JSON.stringify({ success: true, message: "配置已同步 (服务端加密存储)" }), { status: 200 });
     } else {
-      throw new Error("数据库更新失败");
+      throw new Error("DB Update failed");
     }
 
   } catch (err) {
-    return new Response(JSON.stringify({ success: false, message: err.message || "服务器内部错误" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
+    console.error(err);
+    return new Response(JSON.stringify({ success: false, message: "更新失败" }), { status: 500 });
   }
 }

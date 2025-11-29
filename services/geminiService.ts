@@ -48,12 +48,18 @@ const buildPrompt = (divination: DivinationResult, userQuestion: string): string
  */
 const callProxyStream = async (
   payload: any, 
+  token: string | undefined,
   onStreamUpdate: (text: string) => void
 ): Promise<string> => {
   try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const response = await fetch('/api/ai-proxy', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers,
       body: JSON.stringify(payload)
     });
 
@@ -125,8 +131,8 @@ export const getInterpretation = async (
   userQuestion: string,
   provider: AIProvider,
   config: { 
-    username?: string; 
-    apiKey?: string;   
+    token?: string; // JWT Token for user
+    apiKey?: string; // Guest Key
     customConfig?: CustomAIConfig 
   },
   onStreamUpdate: (text: string) => void
@@ -138,12 +144,12 @@ export const getInterpretation = async (
     const payload: any = {
         provider,
         prompt,
-        username: config.username, 
+        // username 已废弃，通过 token 鉴权
         apiKey: config.apiKey, 
         customConfig: config.customConfig
     };
 
-    const result = await callProxyStream(payload, onStreamUpdate);
+    const result = await callProxyStream(payload, config.token, onStreamUpdate);
     return result;
   } catch (error: any) {
     const errMsg = `解读中断：${error.message || '网络连接失败'}`;

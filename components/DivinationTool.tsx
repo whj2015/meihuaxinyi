@@ -69,7 +69,7 @@ const DivinationTool: React.FC = () => {
 
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false); 
-  const [provider, setProvider] = useState<AIProvider>('deepseek'); // Default DeepSeek
+  const [provider, setProvider] = useState<AIProvider>('deepseek'); 
   
   const [guestApiKeys, setGuestApiKeys] = useState({ gemini: '', deepseek: '' });
   const [customConfig, setCustomConfig] = useState<CustomAIConfig>({ apiKey: '', baseUrl: '', modelName: '' });
@@ -85,6 +85,16 @@ const DivinationTool: React.FC = () => {
   const [historyList, setHistoryList] = useState<HistoryRecord[]>([]);
   const [currentRecordId, setCurrentRecordId] = useState<number | string | null>(null);
 
+  // Derived Values
+  const credits = user.credits || 0;
+  const isFreeTierAvailable = user.isLoggedIn && credits > 0;
+  const numLabels = ['上卦数', '下卦数', '动爻数'];
+  
+  const shouldShowSettingsDot = !user.isLoggedIn && (
+      (provider === 'gemini' && !guestApiKeys.gemini) ||
+      (provider === 'deepseek' && !guestApiKeys.deepseek)
+  );
+
   // Init
   useEffect(() => {
     const savedUserStr = localStorage.getItem('user_profile');
@@ -92,11 +102,10 @@ const DivinationTool: React.FC = () => {
         setUser(JSON.parse(savedUserStr));
     }
     const savedProvider = localStorage.getItem('ai_provider') as AIProvider;
-    // 确保默认回退到 deepseek
     if (savedProvider) {
         setProvider(savedProvider);
     } else {
-        setProvider('deepseek');
+        setProvider('deepseek'); // Default to DeepSeek
     }
     const savedCustomConfig = localStorage.getItem('custom_ai_config');
     if (savedCustomConfig) {
@@ -106,16 +115,22 @@ const DivinationTool: React.FC = () => {
 
   // Fetch History when User changes
   useEffect(() => {
-      if (user.isLoggedIn) {
-          fetchHistory(user.username);
+      if (user.isLoggedIn && user.token) {
+          fetchHistory();
       } else {
           setHistoryList([]); 
       }
-  }, [user.isLoggedIn, user.username]);
+  }, [user.isLoggedIn, user.token]);
 
-  const fetchHistory = async (username: string) => {
+  const fetchHistory = async () => {
       try {
-          const res = await fetch(`/api/history?username=${username}`);
+          const res = await fetch(`/api/history`, {
+              method: 'GET',
+              headers: { 
+                  'Authorization': `Bearer ${user.token}`,
+                  'Content-Type': 'application/json'
+              }
+          });
           const data = await res.json();
           if (data.success) {
               setHistoryList(data.data);
@@ -125,14 +140,11 @@ const DivinationTool: React.FC = () => {
       }
   };
 
-  // Auth Validation
   const validateAuthInput = (): string | null => {
       const { username, password } = authForm;
       if (!username || !password) return '请输入用户名和密码';
       if (username.length < 3) return '用户名至少 3 个字符';
       if (username.length > 20) return '用户名过长';
-      
-      // 注册模式下的额外检查
       if (authMode === 'register') {
           if (password.length < 6) return '密码至少 6 位，请设置更安全的密码';
           const usernameRegex = /^[\u4e00-\u9fa5a-zA-Z0-9_]+$/;
@@ -141,7 +153,6 @@ const DivinationTool: React.FC = () => {
       return null;
   };
 
-  // Auth Logic
   const handleAuth = async () => {
     const errorMsg = validateAuthInput();
     if (errorMsg) {
@@ -185,18 +196,16 @@ const DivinationTool: React.FC = () => {
     }
   };
 
-  // Handle Enter Key for Login
   const handleAuthKeyDown = (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') {
-          handleAuth();
-      }
+      if (e.key === 'Enter') handleAuth();
   };
 
   const processLoginSuccess = (data: any) => {
     const newUser = { 
         username: data.username, 
         isLoggedIn: true,
-        credits: data.credits // Update to use credits
+        credits: data.credits,
+        token: data.token // 存储 JWT Token
     };
     setUser(newUser);
     localStorage.setItem('user_profile', JSON.stringify(newUser));
@@ -210,9 +219,22 @@ const DivinationTool: React.FC = () => {
     setAuthForm({ username: '', password: '' });
   };
 
-  // 充值预留接口
   const handleRecharge = async () => {
-      alert("充值系统即将上线，敬请期待！");
+      if (!user.isLoggedIn) return;
+      try {
+        const res = await fetch('/api/payment/create-order', {
+            method: 'POST',
+            headers: { 
+                'Authorization': `Bearer ${user.token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ amount: 10, username: user.username })
+        });
+        const data = await res.json();
+        alert(data.message);
+      } catch (e) {
+          alert("服务连接失败");
+      }
   };
 
   const saveSettings = async () => {
@@ -228,17 +250,15 @@ const DivinationTool: React.FC = () => {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${user.token}`,
                     'x-gemini-token': encodeKey(guestApiKeys.gemini),
                     'x-deepseek-token': encodeKey(guestApiKeys.deepseek)
                 },
-                body: JSON.stringify({
-                    username: user.username,
-                    password: authForm.password,
-                })
+                body: JSON.stringify({}) 
             });
             const data = await response.json();
             if (data.success) {
-                alert("配置已同步至云端。");
+                alert("配置已加密同步至云端。");
                 setShowSettings(false);
                 setGuestApiKeys({ gemini: '', deepseek: '' }); 
             } else {
@@ -261,13 +281,11 @@ const DivinationTool: React.FC = () => {
           try {
               const res = await fetch('/api/history', {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                      username: user.username,
-                      question: q,
-                      n1, n2, n3,
-                      timestamp
-                  })
+                  headers: { 
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${user.token}`
+                  },
+                  body: JSON.stringify({ question: q, n1, n2, n3, timestamp })
               });
               const data = await res.json();
               if (data.success) {
@@ -291,7 +309,10 @@ const DivinationTool: React.FC = () => {
            try {
               await fetch('/api/history', {
                   method: 'PUT',
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: { 
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${user.token}`
+                  },
                   body: JSON.stringify({ id: currentRecordId, ai_response: text })
               });
            } catch(e) { console.error("Update AI history failed", e); }
@@ -309,174 +330,124 @@ const DivinationTool: React.FC = () => {
       setTimeout(() => document.getElementById('result-start')?.scrollIntoView({behavior:'smooth'}), 100);
   };
 
+  // --- Handlers for Input/Action ---
+  const handleInputChange = (index: number, value: string) => {
+    const newInputs = [...inputs];
+    if (value.length > 3) return; // Limit to 3 chars
+    newInputs[index] = value;
+    setInputs(newInputs);
+  };
+
+  const handleRandom = () => {
+    const n1 = Math.floor(Math.random() * 800) + 100;
+    const n2 = Math.floor(Math.random() * 800) + 100;
+    const n3 = Math.floor(Math.random() * 800) + 100;
+    setInputs([n1.toString(), n2.toString(), n3.toString()]);
+  };
+
+  const handleCalculate = async () => {
+    const n1 = parseInt(inputs[0]);
+    const n2 = parseInt(inputs[1]);
+    const n3 = parseInt(inputs[2]);
+
+    if (isNaN(n1) || isNaN(n2) || isNaN(n3)) {
+        alert("请输入有效的数字 (1-999)");
+        return;
+    }
+    
+    // Close keyboard on mobile
+    (document.activeElement as HTMLElement)?.blur();
+
+    const res = calculateDivination(n1, n2, n3);
+    setResult(res);
+    setAiInterpretation(null); 
+    
+    await saveHistory(question, n1, n2, n3);
+
+    setTimeout(() => {
+        const element = document.getElementById('result-start');
+        if (element) element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  };
+
   const handleAskAI = async () => {
     if (!result) return;
     setLoadingAI(true);
     setAiInterpretation("");
     
-    const config = {
-        username: user.isLoggedIn ? user.username : undefined,
-        apiKey: !user.isLoggedIn ? (provider === 'gemini' ? guestApiKeys.gemini : guestApiKeys.deepseek) : undefined,
-        customConfig: provider === 'custom' ? customConfig : undefined
-    };
+    let currentKey = '';
+    if (provider === 'gemini') currentKey = guestApiKeys.gemini;
+    if (provider === 'deepseek') currentKey = guestApiKeys.deepseek;
 
-    let fullText = "";
-    const resText = await getInterpretation(
-        result, 
-        question, 
-        provider, 
-        config,
-        (text) => {
-            setAiInterpretation(text);
-            fullText = text;
+    await getInterpretation(
+        result,
+        question,
+        provider,
+        {
+            token: user.token,
+            apiKey: currentKey,
+            customConfig
+        },
+        (chunk) => {
+            setAiInterpretation(prev => (prev || "") + chunk); // Append stream
         }
-    );
-    
-    setLoadingAI(false);
-    
-    if (user.isLoggedIn && !resText.includes("错误")) {
-        // Decrease credits locally for immediate UI update
-        const updatedUser = { ...user, credits: (user.credits || 0) - 1 };
-        setUser(updatedUser);
-        localStorage.setItem('user_profile', JSON.stringify(updatedUser));
-    }
-
-    if (fullText && !fullText.includes("错误")) {
-        updateHistoryAI(fullText);
-    }
+    ).then((finalText) => {
+        setAiInterpretation(finalText);
+        updateHistoryAI(finalText);
+        // Refresh credits if logged in
+        if (user.isLoggedIn && !currentKey && provider !== 'custom') {
+             setUser(prev => ({...prev, credits: Math.max(0, (prev.credits || 0) - 1)}));
+        }
+    }).finally(() => {
+        setLoadingAI(false);
+    });
   };
 
-  const handleInputChange = (index: number, value: string) => {
-    if (value.length > 3) return; 
-    const newInputs = [...inputs];
-    newInputs[index] = value;
-    setInputs(newInputs);
-  };
-  
-  const handleCalculate = () => {
-     const nums = inputs.map(i => parseInt(i, 10));
-     if (nums.some(isNaN)) { alert("请输入数字"); return; }
-     const res = calculateDivination(nums[0], nums[1], nums[2]);
-     setResult(res);
-     setAiInterpretation(null);
-     saveHistory(question, nums[0], nums[1], nums[2]);
-     setTimeout(() => document.getElementById('result-start')?.scrollIntoView({behavior:'smooth'}), 100);
-  };
-  
-  const handleRandom = () => {
-      setInputs([
-          Math.floor(Math.random()*99+1).toString(),
-          Math.floor(Math.random()*99+1).toString(),
-          Math.floor(Math.random()*99+1).toString()
-      ]);
-      setResult(null);
-      setAiInterpretation(null);
-  };
-
-  const credits = user.credits !== undefined ? user.credits : 0;
-  // Free tier check: User is logged in AND has credits > 0 AND not using custom key
-  // Or if user provided own key, they can always use it.
-  // Logic: 
-  // If provider == custom: Use custom.
-  // If provider == gemini/deepseek:
-  //    If user has own key configured in settings (we don't check `guestApiKeys` here because we cleared it on login, 
-  //    we assume backend handles own key priority).
-  //    Actually, purely based on credits if using system key.
-  const isFreeTierAvailable = user.isLoggedIn && credits > 0 && provider !== 'custom';
-  const shouldShowSettingsDot = !user.isLoggedIn; 
-
-  // Helpers for UI ...
+  // --- Helper Functions for Rendering ---
   const getScoreColor = (score: string) => {
-      if (score.includes('Great Auspicious') || score.includes('大吉')) return 'text-red-600 bg-red-50 border-red-100';
-      if (score.includes('Auspicious') || score.includes('小吉')) return 'text-amber-600 bg-amber-50 border-amber-100';
-      if (score.includes('Great Bad') || score.includes('大凶')) return 'text-slate-600 bg-slate-100 border-slate-200';
-      return 'text-slate-500 bg-slate-50 border-slate-100';
-  };
-  
-  const getScoreLabel = (score: string) => {
-      if (score.includes('Great Auspicious')) return '大吉';
-      if (score === 'Auspicious') return '吉';
-      if (score.includes('Minor Auspicious')) return '小吉';
-      if (score.includes('Great Bad')) return '大凶';
-      if (score.includes('Minor Bad')) return '小凶';
-      return '平';
-  };
-
-  const tiTrigram = result ? (result.tiGua === 'upper' ? result.originalHexagram.upper : result.originalHexagram.lower) : null;
-  const yongTrigram = result ? (result.yongGua === 'upper' ? result.originalHexagram.upper : result.originalHexagram.lower) : null;
-
-  const renderRelationVisual = () => {
-      if (!result) return null;
-      const { relation } = result;
-      let arrow = <MoveHorizontal size={20} className="text-slate-300" />;
-      let desc = "比和 (平等)";
-
-      if (relation.includes("用生体")) {
-          arrow = <div className="flex flex-col items-center"><ArrowLeft size={20} className="text-red-500 animate-pulse"/><span className="text-[9px] text-red-500 font-bold mt-1">生</span></div>;
-          desc = "大吉：外界环境全力助你";
-      } else if (relation.includes("体生用")) {
-          arrow = <div className="flex flex-col items-center"><ArrowRight size={20} className="text-slate-400"/><span className="text-[9px] text-slate-400 font-bold mt-1">生</span></div>;
-          desc = "小凶：你在消耗精力付出";
-      } else if (relation.includes("体克用")) {
-          arrow = <div className="flex flex-col items-center"><ArrowRight size={20} className="text-amber-500"/><span className="text-[9px] text-amber-500 font-bold mt-1">克</span></div>;
-          desc = "小吉：努力克服就能掌控";
-      } else if (relation.includes("用克体")) {
-          arrow = <div className="flex flex-col items-center"><ArrowLeft size={20} className="text-slate-600"/><span className="text-[9px] text-slate-600 font-bold mt-1">克</span></div>;
-          desc = "大凶：外界压力巨大难扛";
-      } else if (relation.includes("比和")) {
-          arrow = <div className="flex flex-col items-center"><span className="text-xl font-bold text-amber-500">=</span><span className="text-[9px] text-amber-500 font-bold mt-1">同</span></div>;
-          desc = "大吉：同心协力顺水推舟";
+      switch (score) {
+          case 'Great Auspicious': return 'bg-red-50 text-red-800 border-red-100';
+          case 'Minor Auspicious': return 'bg-orange-50 text-orange-800 border-orange-100';
+          case 'Auspicious': return 'bg-red-50 text-red-800 border-red-100';
+          case 'Minor Bad': return 'bg-slate-50 text-slate-600 border-slate-200';
+          case 'Great Bad': return 'bg-green-50 text-green-800 border-green-100';
+          default: return 'bg-slate-50';
       }
-      return { arrow, desc };
   };
 
-  const relationVisual = renderRelationVisual();
-  const numLabels = ["上卦数", "下卦数", "动爻数"];
+  const getScoreLabel = (score: string) => {
+      switch (score) {
+          case 'Great Auspicious': return '大吉';
+          case 'Minor Auspicious': return '小吉';
+          case 'Auspicious': return '吉';
+          case 'Minor Bad': return '小凶';
+          case 'Great Bad': return '大凶';
+          default: return '平';
+      }
+  };
 
+  // Derived Result Visuals
+  let tiTrigram, yongTrigram, relationVisual;
+  if (result) {
+      tiTrigram = result.tiGua === 'upper' ? result.originalHexagram.upper : result.originalHexagram.lower;
+      yongTrigram = result.yongGua === 'upper' ? result.originalHexagram.upper : result.originalHexagram.lower;
+
+      const getRelationVisual = (score: string) => {
+          switch (score) {
+              case 'Great Auspicious': return { arrow: <ArrowUp size={24} className="text-red-500" />, desc: '大吉 · 生助' };
+              case 'Minor Auspicious': return { arrow: <ArrowUp size={24} className="text-orange-500" />, desc: '小吉 · 比和/克用' };
+              case 'Auspicious': return { arrow: <ArrowUp size={24} className="text-red-500" />, desc: '吉 · 比和' };
+              case 'Minor Bad': return { arrow: <ArrowDown size={24} className="text-slate-400" />, desc: '小凶 · 生用' };
+              case 'Great Bad': return { arrow: <ArrowDown size={24} className="text-green-700" />, desc: '大凶 · 克体' };
+              default: return { arrow: <MoveHorizontal size={24} className="text-slate-300" />, desc: '平' };
+          }
+      };
+      relationVisual = getRelationVisual(result.relationScore);
+  }
+  
   return (
-    <div className="w-full space-y-8 relative">
-      
-      {/* History Sidebar */}
-      {showHistory && (
-          <div className="fixed inset-0 z-[110] flex justify-end">
-              <div className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm" onClick={() => setShowHistory(false)}></div>
-              <div className="relative w-80 max-w-[85vw] h-full bg-white shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col">
-                  {/* ... History UI Content (Same as before) ... */}
-                  <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                      <h3 className="font-serif font-bold text-slate-800 flex items-center gap-2">
-                          <History size={18}/> 起卦记录
-                      </h3>
-                      <button onClick={() => setShowHistory(false)} className="p-1 hover:bg-slate-200 rounded-full transition-colors">
-                          <X size={18} className="text-slate-400"/>
-                      </button>
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
-                      {historyList.length === 0 ? (
-                          <div className="text-center py-10 text-slate-400 text-sm">
-                              <History size={32} className="mx-auto mb-2 opacity-30"/>
-                              暂无记录
-                          </div>
-                      ) : (
-                          historyList.map((record) => (
-                              <div key={record.id} onClick={() => restoreHistory(record)} className="bg-white border border-slate-100 rounded-xl p-3 shadow-sm hover:shadow-md hover:border-amber-200 cursor-pointer transition-all group">
-                                  <div className="flex justify-between items-start mb-2">
-                                      <div className="font-serif font-bold text-slate-800 text-sm line-clamp-1">{record.question || "无题测算"}</div>
-                                      <div className="text-[10px] text-slate-400 font-mono">{new Date(record.timestamp).toLocaleDateString()}</div>
-                                  </div>
-                                  <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 p-1.5 rounded-lg mb-2">
-                                      <Hash size={10}/>
-                                      <span className="font-mono tracking-widest">{record.n1}-{record.n2}-{record.n3}</span>
-                                  </div>
-                                  {record.ai_response && <div className="flex items-center gap-1 text-[10px] text-amber-600 font-medium"><Sparkles size={10}/> 已有大师解读</div>}
-                              </div>
-                          ))
-                      )}
-                  </div>
-              </div>
-          </div>
-      )}
-
-      {/* Settings Modal */}
+      <div className="w-full space-y-8 relative">
+           {/* Settings Modal */}
       {showSettings && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-end md:items-center justify-center p-0 md:p-4">
           <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col animate-in slide-in-from-bottom-10 md:slide-in-from-bottom-0 duration-200">
@@ -497,7 +468,6 @@ const DivinationTool: React.FC = () => {
                                     <button onClick={()=>{setAuthMode('register');setAuthMessage({text:'',type:''})}} className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${authMode==='register'?'bg-white text-slate-900 shadow-sm':'text-slate-400'}`}>注册</button>
                                 </div>
                             </div>
-                            {/* Login Form */}
                             <div className="space-y-3">
                                 <input 
                                     type="text" 
@@ -561,7 +531,6 @@ const DivinationTool: React.FC = () => {
                              ))}
                         </div>
                     </div>
-                    {/* ... API Inputs (Same as before) ... */}
                     <div className="space-y-4">
                         {provider === 'gemini' && (
                             <div className="animate-in fade-in slide-in-from-top-2">
@@ -596,7 +565,7 @@ const DivinationTool: React.FC = () => {
         </div>
       )}
 
-      {/* Main Input Card (No Changes Needed Here) */}
+      {/* Main Input Card */}
       <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100/60 p-6 md:p-10 relative overflow-hidden transition-all hover:shadow-md">
          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-50 rounded-full blur-3xl -z-10 opacity-60"></div>
         <div className="flex justify-between items-center mb-8 md:mb-10">
@@ -642,7 +611,7 @@ const DivinationTool: React.FC = () => {
         </div>
       </div>
 
-      {/* Result Section (Same as before) */}
+      {/* Result Section */}
       {result && tiTrigram && yongTrigram && relationVisual && (
         <div id="result-start" className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700 scroll-mt-28">
             <div className="bg-white rounded-[2rem] p-6 md:p-10 shadow-sm border border-slate-100/60">
@@ -763,7 +732,47 @@ const DivinationTool: React.FC = () => {
             <div className="h-12"></div>
         </div>
       )}
-    </div>
+
+      {/* History Sidebar */}
+      {showHistory && (
+          <div className="fixed inset-0 z-[110] flex justify-end">
+              <div className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm" onClick={() => setShowHistory(false)}></div>
+              <div className="relative w-80 max-w-[85vw] h-full bg-white shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col">
+                  {/* ... History UI Content (Same as before) ... */}
+                  <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                      <h3 className="font-serif font-bold text-slate-800 flex items-center gap-2">
+                          <History size={18}/> 起卦记录
+                      </h3>
+                      <button onClick={() => setShowHistory(false)} className="p-1 hover:bg-slate-200 rounded-full transition-colors">
+                          <X size={18} className="text-slate-400"/>
+                      </button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
+                      {historyList.length === 0 ? (
+                          <div className="text-center py-10 text-slate-400 text-sm">
+                              <History size={32} className="mx-auto mb-2 opacity-30"/>
+                              暂无记录
+                          </div>
+                      ) : (
+                          historyList.map((record) => (
+                              <div key={record.id} onClick={() => restoreHistory(record)} className="bg-white border border-slate-100 rounded-xl p-3 shadow-sm hover:shadow-md hover:border-amber-200 cursor-pointer transition-all group">
+                                  <div className="flex justify-between items-start mb-2">
+                                      <div className="font-serif font-bold text-slate-800 text-sm line-clamp-1">{record.question || "无题测算"}</div>
+                                      <div className="text-[10px] text-slate-400 font-mono">{new Date(record.timestamp).toLocaleDateString()}</div>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 p-1.5 rounded-lg mb-2">
+                                      <Hash size={10}/>
+                                      <span className="font-mono tracking-widest">{record.n1}-{record.n2}-{record.n3}</span>
+                                  </div>
+                                  {record.ai_response && <div className="flex items-center gap-1 text-[10px] text-amber-600 font-medium"><Sparkles size={10}/> 已有大师解读</div>}
+                              </div>
+                          ))
+                      )}
+                  </div>
+              </div>
+          </div>
+      )}
+      </div>
   );
 };
 
