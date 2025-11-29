@@ -92,10 +92,11 @@ const DivinationTool: React.FC = () => {
         setUser(JSON.parse(savedUserStr));
     }
     const savedProvider = localStorage.getItem('ai_provider') as AIProvider;
+    // 确保默认回退到 deepseek
     if (savedProvider) {
         setProvider(savedProvider);
     } else {
-        setProvider('deepseek'); // Force DeepSeek default if not saved
+        setProvider('deepseek');
     }
     const savedCustomConfig = localStorage.getItem('custom_ai_config');
     if (savedCustomConfig) {
@@ -124,12 +125,30 @@ const DivinationTool: React.FC = () => {
       }
   };
 
+  // Auth Validation
+  const validateAuthInput = (): string | null => {
+      const { username, password } = authForm;
+      if (!username || !password) return '请输入用户名和密码';
+      if (username.length < 3) return '用户名至少 3 个字符';
+      if (username.length > 20) return '用户名过长';
+      
+      // 注册模式下的额外检查
+      if (authMode === 'register') {
+          if (password.length < 6) return '密码至少 6 位，请设置更安全的密码';
+          const usernameRegex = /^[\u4e00-\u9fa5a-zA-Z0-9_]+$/;
+          if (!usernameRegex.test(username)) return '用户名仅支持中文、字母、数字和下划线';
+      }
+      return null;
+  };
+
   // Auth Logic
   const handleAuth = async () => {
-    if (!authForm.username || !authForm.password) {
-        setAuthMessage({ text: '请输入完整', type: 'error' });
+    const errorMsg = validateAuthInput();
+    if (errorMsg) {
+        setAuthMessage({ text: errorMsg, type: 'error' });
         return;
     }
+
     setIsAuthProcessing(true);
     setAuthMessage({ text: '', type: '' });
 
@@ -145,6 +164,7 @@ const DivinationTool: React.FC = () => {
 
       if (response.ok && data.success) {
         if (authMode === 'register') {
+             // 注册成功后自动登录
              const loginRes = await fetch('/api/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -156,10 +176,10 @@ const DivinationTool: React.FC = () => {
             processLoginSuccess(data);
         }
       } else {
-        setAuthMessage({ text: data.message || '失败', type: 'error' });
+        setAuthMessage({ text: data.message || '操作失败', type: 'error' });
       }
     } catch (error) {
-      setAuthMessage({ text: '网络错误', type: 'error' });
+      setAuthMessage({ text: '网络错误，请稍后重试', type: 'error' });
     } finally {
       setIsAuthProcessing(false);
     }
@@ -193,17 +213,6 @@ const DivinationTool: React.FC = () => {
   // 充值预留接口
   const handleRecharge = async () => {
       alert("充值系统即将上线，敬请期待！");
-      // Future implementation:
-      /*
-      try {
-          const res = await fetch('/api/payment/create-order', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ username: user.username, amount: 10 })
-          });
-          // ... handle payment flow
-      } catch (e) {}
-      */
   };
 
   const saveSettings = async () => {
@@ -484,8 +493,8 @@ const DivinationTool: React.FC = () => {
                             <div className="flex items-center justify-between mb-2">
                                 <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2"><User size={16} /> 账号登录</h4>
                                 <div className="flex bg-slate-100 p-1 rounded-lg">
-                                    <button onClick={()=>setAuthMode('login')} className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${authMode==='login'?'bg-white text-slate-900 shadow-sm':'text-slate-400'}`}>登录</button>
-                                    <button onClick={()=>setAuthMode('register')} className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${authMode==='register'?'bg-white text-slate-900 shadow-sm':'text-slate-400'}`}>注册</button>
+                                    <button onClick={()=>{setAuthMode('login');setAuthMessage({text:'',type:''})}} className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${authMode==='login'?'bg-white text-slate-900 shadow-sm':'text-slate-400'}`}>登录</button>
+                                    <button onClick={()=>{setAuthMode('register');setAuthMessage({text:'',type:''})}} className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${authMode==='register'?'bg-white text-slate-900 shadow-sm':'text-slate-400'}`}>注册</button>
                                 </div>
                             </div>
                             {/* Login Form */}
@@ -500,18 +509,23 @@ const DivinationTool: React.FC = () => {
                                 />
                                 <input 
                                     type="password" 
-                                    placeholder="密码" 
+                                    placeholder={authMode === 'register' ? "密码 (至少6位)" : "密码"}
                                     value={authForm.password} 
                                     onChange={e=>setAuthForm({...authForm,password:e.target.value})} 
                                     onKeyDown={handleAuthKeyDown}
                                     className="w-full p-3 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400 transition-all"
                                 />
+                                {authMessage.text && (
+                                    <div className={`text-xs px-2 py-1 ${authMessage.type === 'error' ? 'text-red-500' : 'text-green-500'}`}>
+                                        {authMessage.text}
+                                    </div>
+                                )}
                             </div>
                             <button onClick={handleAuth} disabled={isAuthProcessing} className="w-full py-3 bg-slate-900 text-white text-sm font-bold rounded-xl shadow-lg shadow-slate-200 hover:bg-slate-800 active:scale-[0.98] transition-all">
                                 {isAuthProcessing?<Loader2 size={16} className="animate-spin mx-auto"/>:(authMode==='login'?'立即登录':'注册并登录')}
                             </button>
                             <div className="bg-amber-50 text-amber-800 text-xs p-3 rounded-lg flex items-center gap-2 border border-amber-100">
-                                <Gift size={14}/> 注册登录即可获赠 5 点大师解卦灵力
+                                <Gift size={14}/> 注册登录即可获赠 5 点大师解卦点数
                             </div>
                         </div>
                     ) : (
@@ -522,7 +536,7 @@ const DivinationTool: React.FC = () => {
                                     <p className="font-bold text-slate-900">{user.username}</p>
                                     <div className="flex items-center gap-2 mt-1">
                                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${credits>0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
-                                            灵力点数: {credits}
+                                            解卦点数: {credits}
                                         </span>
                                         <button onClick={handleRecharge} className="bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 transition-colors">
                                             <CreditCard size={10}/> 充值
@@ -721,7 +735,7 @@ const DivinationTool: React.FC = () => {
                     <div className="flex items-center gap-2">
                         {isFreeTierAvailable && !aiInterpretation && (
                              <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-100 px-3 py-1 rounded-full">
-                                灵力点数: {credits}
+                                解卦点数: {credits}
                              </span>
                         )}
                         {aiInterpretation && !loadingAI && (
