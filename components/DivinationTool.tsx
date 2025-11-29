@@ -4,7 +4,7 @@ import { calculateDivination } from '../utils/meiHuaLogic';
 import { DivinationResult, AIProvider, UserProfile, CustomAIConfig, HistoryRecord } from '../types';
 import HexagramVisual from './HexagramVisual';
 import { getInterpretation } from '../services/geminiService';
-import { Sparkles, ArrowRight, RefreshCcw, Settings, X, Check, User, LogOut, Gift, RotateCcw, Save, Loader2, Quote, BookOpen, Activity, UserCircle, Briefcase, GitCommit, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, MoveHorizontal, MessageCircle, Hash, History, Clock, CreditCard } from 'lucide-react';
+import { Sparkles, ArrowRight, RefreshCcw, Settings, X, Check, User, LogOut, Gift, RotateCcw, Save, Loader2, Quote, BookOpen, Activity, UserCircle, Briefcase, GitCommit, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, MoveHorizontal, MessageCircle, Hash, History, Clock, CreditCard, Trash2, AlertTriangle } from 'lucide-react';
 
 // --- Markdown Renderer ---
 const FormattedMarkdown: React.FC<{ text: string }> = ({ text }) => {
@@ -84,6 +84,7 @@ const DivinationTool: React.FC = () => {
   // History State
   const [historyList, setHistoryList] = useState<HistoryRecord[]>([]);
   const [currentRecordId, setCurrentRecordId] = useState<number | string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | string | null>(null);
 
   // Derived Values
   const credits = user.credits || 0;
@@ -316,6 +317,37 @@ const DivinationTool: React.FC = () => {
                   body: JSON.stringify({ id: currentRecordId, ai_response: text })
               });
            } catch(e) { console.error("Update AI history failed", e); }
+      }
+  };
+
+  const handleDeleteHistory = async (id: number | string) => {
+      // 1. 如果是访客，直接前端删除
+      if (!user.isLoggedIn) {
+          setHistoryList(prev => prev.filter(item => item.id !== id));
+          setDeletingId(null);
+          return;
+      }
+
+      // 2. 如果是登录用户，请求后端删除
+      try {
+          const res = await fetch('/api/history', {
+              method: 'DELETE',
+              headers: { 
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${user.token}`
+              },
+              body: JSON.stringify({ id })
+          });
+          const data = await res.json();
+          if (data.success) {
+              setHistoryList(prev => prev.filter(item => item.id !== id));
+          } else {
+              alert("删除失败");
+          }
+      } catch (e) {
+          alert("网络错误");
+      } finally {
+          setDeletingId(null);
       }
   };
 
@@ -754,16 +786,39 @@ const DivinationTool: React.FC = () => {
                           </div>
                       ) : (
                           historyList.map((record) => (
-                              <div key={record.id} onClick={() => restoreHistory(record)} className="bg-white border border-slate-100 rounded-xl p-3 shadow-sm hover:shadow-md hover:border-amber-200 cursor-pointer transition-all group">
+                              <div key={record.id} onClick={() => restoreHistory(record)} className="bg-white border border-slate-100 rounded-xl p-3 shadow-sm hover:shadow-md hover:border-amber-200 cursor-pointer transition-all group relative overflow-hidden">
+                                  {deletingId === record.id ? (
+                                      <div className="absolute inset-0 bg-red-50/95 backdrop-blur-sm z-20 flex flex-col items-center justify-center p-4 animate-in fade-in duration-200" onClick={(e) => e.stopPropagation()}>
+                                          <div className="text-red-600 font-bold text-sm flex items-center gap-2 mb-3">
+                                              <AlertTriangle size={16}/> 确定删除此记录?
+                                          </div>
+                                          <div className="flex gap-2 w-full">
+                                              <button onClick={() => setDeletingId(null)} className="flex-1 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50">取消</button>
+                                              <button onClick={() => handleDeleteHistory(record.id)} className="flex-1 py-1.5 bg-red-600 rounded-lg text-xs font-bold text-white hover:bg-red-700 shadow-sm">删除</button>
+                                          </div>
+                                      </div>
+                                  ) : null}
+                                  
                                   <div className="flex justify-between items-start mb-2">
-                                      <div className="font-serif font-bold text-slate-800 text-sm line-clamp-1">{record.question || "无题测算"}</div>
-                                      <div className="text-[10px] text-slate-400 font-mono">{new Date(record.timestamp).toLocaleDateString()}</div>
+                                      <div className="font-serif font-bold text-slate-800 text-sm line-clamp-1 flex-1 pr-2">{record.question || "无题测算"}</div>
+                                      <div className="text-[10px] text-slate-400 font-mono shrink-0">{new Date(record.timestamp).toLocaleDateString()}</div>
                                   </div>
-                                  <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 p-1.5 rounded-lg mb-2">
-                                      <Hash size={10}/>
-                                      <span className="font-mono tracking-widest">{record.n1}-{record.n2}-{record.n3}</span>
+                                  <div className="flex justify-between items-center">
+                                      <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 p-1.5 rounded-lg">
+                                          <Hash size={10}/>
+                                          <span className="font-mono tracking-widest">{record.n1}-{record.n2}-{record.n3}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                          {record.ai_response && <div className="flex items-center gap-1 text-[10px] text-amber-600 font-medium"><Sparkles size={10}/> 已解</div>}
+                                          <button 
+                                            onClick={(e) => { e.stopPropagation(); setDeletingId(record.id); }} 
+                                            className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors opacity-0 group-hover:opacity-100"
+                                            title="删除记录"
+                                          >
+                                              <Trash2 size={14}/>
+                                          </button>
+                                      </div>
                                   </div>
-                                  {record.ai_response && <div className="flex items-center gap-1 text-[10px] text-amber-600 font-medium"><Sparkles size={10}/> 已有大师解读</div>}
                               </div>
                           ))
                       )}

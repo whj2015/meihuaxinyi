@@ -67,6 +67,25 @@ export async function onRequest(context) {
        });
     }
 
+    // DELETE: 删除
+    if (request.method === 'DELETE') {
+        const { id } = await request.json();
+        if (!userPayload) return new Response(JSON.stringify({ success: false }), { status: 401 });
+
+        // 只能删除属于自己的记录
+        const res = await env.DB.prepare(
+            "DELETE FROM history WHERE id = ? AND username = ?"
+        ).bind(id, userPayload.username).run();
+
+        if (res.success) {
+            return new Response(JSON.stringify({ success: true }), {
+                headers: { "Content-Type": "application/json" }
+            });
+        } else {
+            return new Response(JSON.stringify({ success: false, message: "Delete failed" }), { status: 500 });
+        }
+    }
+
     return new Response("Method not allowed", { status: 405 });
   } catch (e) {
     return new Response(JSON.stringify({ success: false, message: e.message }), { status: 500 });
