@@ -388,8 +388,9 @@ const DivinationTool: React.FC = () => {
             apiKey: currentKey,
             customConfig
         },
-        (chunk) => {
-            setAiInterpretation(prev => (prev || "") + chunk); // Append stream
+        (text) => {
+            // FIX: 接收到的 text 已经是全量文本，直接覆盖状态，而不是追加
+            setAiInterpretation(text); 
         }
     ).then((finalText) => {
         setAiInterpretation(finalText);
@@ -738,7 +739,6 @@ const DivinationTool: React.FC = () => {
           <div className="fixed inset-0 z-[110] flex justify-end">
               <div className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm" onClick={() => setShowHistory(false)}></div>
               <div className="relative w-80 max-w-[85vw] h-full bg-white shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col">
-                  {/* ... History UI Content (Same as before) ... */}
                   <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                       <h3 className="font-serif font-bold text-slate-800 flex items-center gap-2">
                           <History size={18}/> 起卦记录
