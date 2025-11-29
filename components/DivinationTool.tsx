@@ -1,5 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { calculateDivination } from '../utils/meiHuaLogic';
 import { DivinationResult, AIProvider, UserProfile, CustomAIConfig, HistoryRecord } from '../types';
 import HexagramVisual from './HexagramVisual';
@@ -370,25 +370,19 @@ const DivinationTool: React.FC = () => {
     setInputs(newInputs);
   };
 
-  const handleReset = () => {
-      setInputs(['', '', '']);
-      setQuestion('');
-      setResult(null);
-      setAiInterpretation(null);
-      setCurrentRecordId(null);
-  };
-
   const handleRandom = () => {
-    // 直接生成并设置，消除中间的清空状态导致的闪烁
+    // Generate new numbers directly to avoid UI flickering
     const n1 = Math.floor(Math.random() * 800) + 100;
     const n2 = Math.floor(Math.random() * 800) + 100;
     const n3 = Math.floor(Math.random() * 800) + 100;
     
-    setInputs([n1.toString(), n2.toString(), n3.toString()]);
+    // Clear previous results but keep inputs filled instantly
     setQuestion('');
     setResult(null);
     setAiInterpretation(null);
     setCurrentRecordId(null);
+    
+    setInputs([n1.toString(), n2.toString(), n3.toString()]);
   };
 
   const handleCalculate = async () => {
@@ -780,7 +774,7 @@ const DivinationTool: React.FC = () => {
       )}
 
       {/* History Sidebar */}
-      {showHistory && (
+      {showHistory && createPortal(
           <>
             {/* Backdrop - Separate div to ensure click handling is clean */}
             <div 
@@ -835,7 +829,7 @@ const DivinationTool: React.FC = () => {
                                           {record.ai_response && <div className="flex items-center gap-1 text-[10px] text-amber-600 font-medium bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100"><Sparkles size={10}/> 已解</div>}
                                           <button 
                                             onClick={(e) => { e.stopPropagation(); setDeletingId(record.id); }} 
-                                            className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all opacity-0 group-hover:opacity-100 -mr-1"
+                                            className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 -mr-1"
                                             title="删除记录"
                                           >
                                               <Trash2 size={14}/>
@@ -847,7 +841,8 @@ const DivinationTool: React.FC = () => {
                       )}
                   </div>
             </div>
-          </>
+          </>,
+          document.body
       )}
       </div>
   );
