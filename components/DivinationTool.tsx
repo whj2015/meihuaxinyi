@@ -4,7 +4,7 @@ import { calculateDivination } from '../utils/meiHuaLogic';
 import { DivinationResult, AIProvider, UserProfile, CustomAIConfig, HistoryRecord } from '../types';
 import HexagramVisual from './HexagramVisual';
 import { getInterpretation } from '../services/geminiService';
-import { Sparkles, ArrowRight, RefreshCcw, Settings, X, Check, User, LogOut, Gift, RotateCcw, Save, Loader2, Quote, BookOpen, Activity, UserCircle, Briefcase, GitCommit, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, MoveHorizontal, MessageCircle, Hash, History, Clock, CreditCard, Trash2, AlertTriangle } from 'lucide-react';
+import { Sparkles, ArrowRight, RefreshCcw, Settings, X, Check, User, LogOut, Gift, RotateCcw, Save, Loader2, Quote, BookOpen, Activity, UserCircle, Briefcase, GitCommit, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, MoveHorizontal, MessageCircle, Hash, History, Clock, CreditCard, Trash2, AlertTriangle, Eraser } from 'lucide-react';
 
 // --- Markdown Renderer ---
 const FormattedMarkdown: React.FC<{ text: string }> = ({ text }) => {
@@ -370,11 +370,27 @@ const DivinationTool: React.FC = () => {
     setInputs(newInputs);
   };
 
+  const handleReset = () => {
+      setInputs(['', '', '']);
+      setQuestion('');
+      setResult(null);
+      setAiInterpretation(null);
+      setCurrentRecordId(null);
+  };
+
   const handleRandom = () => {
-    const n1 = Math.floor(Math.random() * 800) + 100;
-    const n2 = Math.floor(Math.random() * 800) + 100;
-    const n3 = Math.floor(Math.random() * 800) + 100;
-    setInputs([n1.toString(), n2.toString(), n3.toString()]);
+    setInputs(['', '', '']);
+    setQuestion('');
+    setResult(null);
+    setAiInterpretation(null);
+    setCurrentRecordId(null);
+    // Slight delay to allow UI to clear before setting new randoms
+    setTimeout(() => {
+        const n1 = Math.floor(Math.random() * 800) + 100;
+        const n2 = Math.floor(Math.random() * 800) + 100;
+        const n3 = Math.floor(Math.random() * 800) + 100;
+        setInputs([n1.toString(), n2.toString(), n3.toString()]);
+    }, 50);
   };
 
   const handleCalculate = async () => {
@@ -481,8 +497,8 @@ const DivinationTool: React.FC = () => {
       <div className="w-full space-y-8 relative">
            {/* Settings Modal */}
       {showSettings && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-end md:items-center justify-center p-0 md:p-4">
-          <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col animate-in slide-in-from-bottom-10 md:slide-in-from-bottom-0 duration-200">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[150] flex items-end md:items-center justify-center p-0 md:p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl w-full max-w-lg max-h-[90dvh] flex flex-col animate-in slide-in-from-bottom-10 md:slide-in-from-bottom-0 duration-300">
              <div className="md:hidden w-full flex justify-center pt-3 pb-1"><div className="w-12 h-1.5 bg-slate-200 rounded-full"></div></div>
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white shrink-0 md:rounded-t-2xl">
               <h3 className="font-serif font-bold text-slate-800 text-lg">设置与同步</h3>
@@ -637,7 +653,8 @@ const DivinationTool: React.FC = () => {
                 ))}
             </div>
             <div className="flex gap-4 pt-4 border-t border-slate-100/50">
-                <button onClick={handleRandom} className="w-16 h-14 md:h-16 flex items-center justify-center rounded-2xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 active:scale-95 transition-all" title="随机生成"><RefreshCcw size={22}/></button>
+                <button onClick={handleReset} className="w-14 h-14 md:h-16 flex items-center justify-center rounded-2xl border border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600 active:scale-95 transition-all" title="清空重置"><Eraser size={20}/></button>
+                <button onClick={handleRandom} className="w-14 h-14 md:h-16 flex items-center justify-center rounded-2xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 active:scale-95 transition-all" title="随机生成"><RefreshCcw size={22}/></button>
                 <button onClick={handleCalculate} className="flex-1 h-14 md:h-16 bg-slate-900 text-white rounded-2xl font-bold text-lg shadow-xl shadow-slate-200 hover:shadow-2xl hover:-translate-y-0.5 active:scale-[0.98] transition-all flex justify-center items-center gap-3">开始起卦 <ArrowRight size={20} className="opacity-80"/></button>
             </div>
         </div>
@@ -767,52 +784,61 @@ const DivinationTool: React.FC = () => {
 
       {/* History Sidebar */}
       {showHistory && (
-          <div className="fixed inset-0 z-[110] flex justify-end">
-              <div className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm" onClick={() => setShowHistory(false)}></div>
-              <div className="relative w-80 max-w-[85vw] h-full bg-white shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col">
-                  <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+          <>
+            {/* Backdrop - Separate div to ensure click handling is clean */}
+            <div 
+                className="fixed inset-0 z-[140] bg-slate-900/30 backdrop-blur-sm animate-in fade-in duration-300"
+                onClick={() => setShowHistory(false)}
+            />
+            
+            {/* Drawer */}
+            <div className="fixed inset-y-0 right-0 z-[150] w-full md:w-96 bg-white shadow-2xl border-l border-slate-100 flex flex-col h-[100dvh] animate-in slide-in-from-right duration-300 sm:duration-500">
+                  <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white/80 backdrop-blur-md sticky top-0 z-10 shrink-0">
                       <h3 className="font-serif font-bold text-slate-800 flex items-center gap-2">
                           <History size={18}/> 起卦记录
                       </h3>
-                      <button onClick={() => setShowHistory(false)} className="p-1 hover:bg-slate-200 rounded-full transition-colors">
+                      <button onClick={() => setShowHistory(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
                           <X size={18} className="text-slate-400"/>
                       </button>
                   </div>
-                  <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
+                  
+                  {/* List Content */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar overscroll-contain pb-20">
                       {historyList.length === 0 ? (
-                          <div className="text-center py-10 text-slate-400 text-sm">
-                              <History size={32} className="mx-auto mb-2 opacity-30"/>
-                              暂无记录
+                          <div className="text-center py-20 text-slate-400 text-sm">
+                              <History size={32} className="mx-auto mb-3 opacity-30"/>
+                              <p>暂无记录</p>
+                              <p className="text-xs text-slate-300 mt-1">起卦后将自动保存</p>
                           </div>
                       ) : (
                           historyList.map((record) => (
-                              <div key={record.id} onClick={() => restoreHistory(record)} className="bg-white border border-slate-100 rounded-xl p-3 shadow-sm hover:shadow-md hover:border-amber-200 cursor-pointer transition-all group relative overflow-hidden">
+                              <div key={record.id} onClick={() => restoreHistory(record)} className="bg-white border border-slate-100 rounded-xl p-3.5 shadow-sm hover:shadow-md hover:border-amber-200 cursor-pointer transition-all group relative overflow-hidden">
                                   {deletingId === record.id ? (
                                       <div className="absolute inset-0 bg-red-50/95 backdrop-blur-sm z-20 flex flex-col items-center justify-center p-4 animate-in fade-in duration-200" onClick={(e) => e.stopPropagation()}>
                                           <div className="text-red-600 font-bold text-sm flex items-center gap-2 mb-3">
                                               <AlertTriangle size={16}/> 确定删除此记录?
                                           </div>
                                           <div className="flex gap-2 w-full">
-                                              <button onClick={() => setDeletingId(null)} className="flex-1 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50">取消</button>
-                                              <button onClick={() => handleDeleteHistory(record.id)} className="flex-1 py-1.5 bg-red-600 rounded-lg text-xs font-bold text-white hover:bg-red-700 shadow-sm">删除</button>
+                                              <button onClick={() => setDeletingId(null)} className="flex-1 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50">取消</button>
+                                              <button onClick={() => handleDeleteHistory(record.id)} className="flex-1 py-2 bg-red-600 rounded-lg text-xs font-bold text-white hover:bg-red-700 shadow-sm">删除</button>
                                           </div>
                                       </div>
                                   ) : null}
                                   
-                                  <div className="flex justify-between items-start mb-2">
-                                      <div className="font-serif font-bold text-slate-800 text-sm line-clamp-1 flex-1 pr-2">{record.question || "无题测算"}</div>
-                                      <div className="text-[10px] text-slate-400 font-mono shrink-0">{new Date(record.timestamp).toLocaleDateString()}</div>
+                                  <div className="flex justify-between items-start mb-2.5">
+                                      <div className="font-serif font-bold text-slate-800 text-sm line-clamp-1 flex-1 pr-3">{record.question || "无题测算"}</div>
+                                      <div className="text-[10px] text-slate-400 font-mono shrink-0 bg-slate-50 px-1.5 py-0.5 rounded">{new Date(record.timestamp).toLocaleDateString()}</div>
                                   </div>
                                   <div className="flex justify-between items-center">
-                                      <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 p-1.5 rounded-lg">
+                                      <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 p-1.5 rounded-lg border border-slate-100/50">
                                           <Hash size={10}/>
                                           <span className="font-mono tracking-widest">{record.n1}-{record.n2}-{record.n3}</span>
                                       </div>
-                                      <div className="flex items-center gap-2">
-                                          {record.ai_response && <div className="flex items-center gap-1 text-[10px] text-amber-600 font-medium"><Sparkles size={10}/> 已解</div>}
+                                      <div className="flex items-center gap-3">
+                                          {record.ai_response && <div className="flex items-center gap-1 text-[10px] text-amber-600 font-medium bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100"><Sparkles size={10}/> 已解</div>}
                                           <button 
                                             onClick={(e) => { e.stopPropagation(); setDeletingId(record.id); }} 
-                                            className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors opacity-0 group-hover:opacity-100"
+                                            className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all opacity-0 group-hover:opacity-100 -mr-1"
                                             title="删除记录"
                                           >
                                               <Trash2 size={14}/>
@@ -823,8 +849,8 @@ const DivinationTool: React.FC = () => {
                           ))
                       )}
                   </div>
-              </div>
-          </div>
+            </div>
+          </>
       )}
       </div>
   );
