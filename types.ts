@@ -76,7 +76,7 @@ export interface UserProfile {
   username: string;
   isLoggedIn: boolean;
   token?: string;
-  usageCount?: number; // 已使用免费额度次数
+  credits?: number; // 剩余灵力/点数 (取代 usageCount)
 }
 
 export interface HistoryRecord {

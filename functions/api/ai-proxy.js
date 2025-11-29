@@ -19,49 +19,51 @@ export async function onRequestPost(context) {
       "Content-Type": "application/json"
     };
 
-    let useFreeTier = false;
+    let deductCredits = false;
 
-    // 1. 如果有用户名，尝试获取 Key
+    // 1. 如果有用户名，进行鉴权和点数检查
     if (username) {
-      const user = await env.DB.prepare("SELECT gemini_key, deepseek_key, usage_count FROM users WHERE username = ?").bind(username).first();
+      const user = await env.DB.prepare("SELECT gemini_key, deepseek_key, credits FROM users WHERE username = ?").bind(username).first();
       
       if (user) {
+        // 优先使用用户配置的 Key
         if (finalProvider === 'gemini' && user.gemini_key) finalApiKey = user.gemini_key;
         else if (finalProvider === 'deepseek' && user.deepseek_key) finalApiKey = user.deepseek_key;
 
-        // 【核心逻辑】免费额度判断
-        // 如果用户没有配置 Key，且使用次数小于 5 次
+        // 如果用户没有配置 Key，检查是否有点数(credits)可以使用系统 Key
         if (!finalApiKey && finalProvider !== 'custom') {
-           if ((user.usage_count || 0) < 5) {
-               // 从数据库获取管理员 (ID=1) 的 Key
+           const credits = user.credits !== null ? user.credits : 0;
+           
+           if (credits > 0) {
+               // 尝试获取管理员 (ID=1) 的 Key
                const admin = await env.DB.prepare("SELECT gemini_key, deepseek_key FROM users WHERE id = 1").first();
                
                if (admin) {
-                   // 1. 尝试匹配当前请求的 Provider
+                   // 智能匹配 Key
                    if (finalProvider === 'deepseek' && admin.deepseek_key) {
                        finalApiKey = admin.deepseek_key;
-                       useFreeTier = true;
+                       deductCredits = true;
                    } else if (finalProvider === 'gemini' && admin.gemini_key) {
                        finalApiKey = admin.gemini_key;
-                       useFreeTier = true;
+                       deductCredits = true;
                    } 
-                   // 2. 如果对应 Provider 的 Key 没有，尝试回退到另一个可用的 Key
+                   // 回退策略
                    else if (admin.deepseek_key) {
                        finalProvider = 'deepseek';
                        finalApiKey = admin.deepseek_key;
-                       useFreeTier = true;
+                       deductCredits = true;
                    } else if (admin.gemini_key) {
                        finalProvider = 'gemini';
                        finalApiKey = admin.gemini_key;
-                       useFreeTier = true;
+                       deductCredits = true;
                    }
                }
                
                if (!finalApiKey) {
-                   return new Response(JSON.stringify({ error: "系统免费额度暂时不可用，请联系管理员或自行配置 Key" }), { status: 400 });
+                   return new Response(JSON.stringify({ error: "系统服务暂时繁忙，请稍后再试或配置自有Key" }), { status: 503 });
                }
            } else {
-               return new Response(JSON.stringify({ error: "免费试用次数已用完，请在设置中配置您的 API Key" }), { status: 402 }); // Payment Required
+               return new Response(JSON.stringify({ error: "您的灵力点数不足，请充值或配置 API Key" }), { status: 402 }); 
            }
         }
       }
@@ -121,10 +123,9 @@ export async function onRequestPost(context) {
         return new Response(JSON.stringify({ error: `AI 服务错误: ${upstreamResponse.status}`, details: errText }), { status: upstreamResponse.status });
     }
 
-    // 4. 如果使用了免费额度，请求成功后扣除次数
-    // 乐观扣除
-    if (useFreeTier && username) {
-        await env.DB.prepare("UPDATE users SET usage_count = usage_count + 1 WHERE username = ?").bind(username).run();
+    // 4. 扣费逻辑：只有在使用系统Key成功请求后才扣除点数
+    if (deductCredits && username) {
+        await env.DB.prepare("UPDATE users SET credits = credits - 1 WHERE username = ?").bind(username).run();
     }
 
     // 5. 直接透传流式响应

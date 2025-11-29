@@ -21,11 +21,10 @@ export async function onRequestPost(context) {
       });
     }
 
-    // 2. 插入新用户 (初始化 usage_count 为 0)
-    // 注意：如果您的 DB schema usage_count 默认为 NULL，这里需要显式插入 0
-    // 如果之前没有 usage_count 列，请确保已运行 ALTER TABLE users ADD COLUMN usage_count INTEGER DEFAULT 0;
+    // 2. 插入新用户 (初始化 credits 为 5)
+    // 请确保已运行: ALTER TABLE users ADD COLUMN credits INTEGER DEFAULT 5;
     const result = await env.DB.prepare(
-      "INSERT INTO users (username, password, gemini_key, deepseek_key, usage_count) VALUES (?, ?, ?, ?, 0)"
+      "INSERT INTO users (username, password, gemini_key, deepseek_key, credits) VALUES (?, ?, ?, ?, 5)"
     ).bind(username, password, "", "").run();
 
     if (result.success) {
