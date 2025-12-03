@@ -22,11 +22,10 @@ const App: React.FC = () => {
     showSettings, setShowSettings, showSaveModal, setShowSaveModal, showPetList, setShowPetList, 
     showAchievementModal, setShowAchievementModal,
     showCharacterModal, setShowCharacterModal, showInventoryModal, setShowInventoryModal,
-    aiConfig, setAiConfig,
     combatTarget, combatState, combatLog, combatEndingRef, combatResult, lastAction,
     interactionTarget, interactionSource, knownLocations,
     worldRegistry, // Grab registry to find exits
-    handleSend, handleSaveSettings,
+    handleSend,
     handleQuickSave, handleQuickLoad, handleExportSave, handleImportSave,
     handleEntityClick, handleInventoryItemClick, closeInteraction,
     handlePickup, handleDropItem, handleUseItem, startCombatFromOverlay, handleObserveItem, handleObserveMonster,
@@ -47,7 +46,7 @@ const App: React.FC = () => {
     <div className="fixed inset-0 bg-[#050b14] flex flex-col font-['Noto_Sans_SC'] selection:bg-teal-500/30 overflow-hidden">
       
       <SettingsModal 
-         isOpen={showSettings} onClose={() => setShowSettings(false)} config={aiConfig} setConfig={setAiConfig} onSave={handleSaveSettings} initialized={initialized}
+         isOpen={showSettings} onClose={() => setShowSettings(false)} initialized={initialized}
       />
       <SaveLoadModal 
          isOpen={showSaveModal} onClose={() => setShowSaveModal(false)} stats={stats} onQuickSave={handleQuickSave} onQuickLoad={handleQuickLoad} onExportSave={handleExportSave} onImportSave={handleImportSave} initialized={initialized}

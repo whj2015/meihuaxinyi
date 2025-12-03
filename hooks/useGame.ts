@@ -353,7 +353,7 @@ export const useGame = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
-  const [aiConfig, setAiConfig] = useState<AISettings>({ provider: 'local', apiKey: 'offline', model: 'local' } as any);
+  // Removed aiConfig state as it's now pure offline
 
   const [showSettings, setShowSettings] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -497,7 +497,7 @@ export const useGame = () => {
     }
   };
 
-  const startGame = async (config?: AISettings) => {
+  const startGame = async () => {
     if (initialized) return;
     setIsLoading(true);
     setStreamText("");
@@ -765,7 +765,6 @@ export const useGame = () => {
     showSettings, setShowSettings, showSaveModal, setShowSaveModal, showPetList, setShowPetList, 
     showAchievementModal, setShowAchievementModal,
     showCharacterModal, setShowCharacterModal, showInventoryModal, setShowInventoryModal,
-    aiConfig, setAiConfig,
     combatTarget, combatState, combatLog, combatEndingRef, combatResult,
     lastAction,
     interactionTarget, interactionSource, knownLocations,
@@ -789,7 +788,7 @@ export const useGame = () => {
             r.readAsText(f); 
         } 
     },
-    handleSaveSettings: () => { updateGameConfig(aiConfig); setShowSettings(false); }, // simplified
+    // Removed handleSaveSettings since settings are gone
     // Pet
     handleSwitchPet: (p: Pet) => { setStats(s => ({...s, pet: p})); setShowPetList(false); addLog(`召唤了 ${p.name}`, 'system'); },
     handleRecallPet: () => { setStats(s => ({...s, pet: undefined})); setShowPetList(false); addLog(`收回了幻兽。`, 'system'); },

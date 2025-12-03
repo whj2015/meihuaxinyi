@@ -1,18 +1,14 @@
 
 import React from 'react';
-import { Cpu, RotateCcw, CheckCircle } from 'lucide-react';
-import { AISettings } from '../../types';
+import { Cpu, RotateCcw, CheckCircle, Info } from 'lucide-react';
 
 interface SettingsModalProps {
     isOpen: boolean;
     onClose: () => void;
-    config: AISettings;
-    setConfig: React.Dispatch<React.SetStateAction<AISettings>>;
-    onSave: () => void;
     initialized: boolean;
 }
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onSave }) => {
+const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     if (!isOpen) return null;
 
     const handleReset = () => {
@@ -25,7 +21,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onSave }
     return (
         <div 
             onClick={onClose}
-            className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center backdrop-blur-md animate-fade-in"
+            className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center backdrop-blur-md animate-fade-in font-['Noto_Sans_SC']"
         >
               <div 
                   onClick={(e) => e.stopPropagation()}
@@ -33,7 +29,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onSave }
               >
                   <div className="flex items-center gap-3 mb-6 border-b border-teal-500/20 pb-4">
                       <Cpu className="text-teal-400" />
-                      <h2 className="text-xl font-bold text-white">游戏设置 / Game Info</h2>
+                      <h2 className="text-xl font-bold text-white">系统菜单 / System</h2>
                   </div>
                   
                   <div className="space-y-6 mb-8 text-center">
@@ -43,14 +39,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onSave }
                           <p className="text-sm text-gray-400">
                               Offline Mode Active
                           </p>
-                          <p className="text-xs text-gray-500 mt-1">
-                              游戏逻辑完全在本地运行，无需互联网连接，无需 API Key。
-                          </p>
-                      </div>
-
-                      <div className="text-xs text-gray-500 text-left space-y-2">
-                          <p>• 进度会自动保存在浏览器本地存储中。</p>
-                          <p>• 使用“系统 -> 存档/读取”来导出备份。</p>
+                          <div className="flex items-start gap-2 text-xs text-gray-500 mt-2 bg-black/20 p-2 rounded text-left w-full">
+                              <Info size={14} className="shrink-0 mt-0.5" />
+                              <span>游戏逻辑完全在本地运行，无需互联网连接，无需任何配置。您的进度会自动保存在浏览器的本地存储中。</span>
+                          </div>
                       </div>
                   </div>
 
