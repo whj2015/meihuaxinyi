@@ -1,225 +1,92 @@
 
 import React, { useState } from 'react';
-import { Menu, MapPin, ShieldAlert, Sparkles } from 'lucide-react'; 
-import Sidebar from './components/Sidebar';
-import SettingsModal from './components/modals/SettingsModal';
-import SaveLoadModal from './components/modals/SaveLoadModal';
-import CombatOverlay from './components/overlays/CombatOverlay';
-import InteractionOverlay from './components/overlays/InteractionOverlay';
-import PetListOverlay from './components/overlays/PetListOverlay';
-import AchievementOverlay from './components/overlays/AchievementOverlay';
-import CharacterModal from './components/modals/CharacterModal';
-import InventoryModal from './components/modals/InventoryModal';
-import LogViewer from './components/game/LogViewer';
-import EntityGrid from './components/game/EntityGrid';
-import ActionPanel from './components/game/ActionPanel';
-import { useGame } from './hooks/useGame';
-import { ActionCategory, Entity, LocationData } from './types';
+import Roadmap from './components/Roadmap';
+import DivinationTool from './components/DivinationTool';
+import HexagramLib from './components/HexagramLib';
+import { BookOpen, Compass, Library } from 'lucide-react';
 
-const App: React.FC = () => {
-  const {
-    logs, isLoading, stats, quests, entities, initialized, streamText,
-    showSettings, setShowSettings, showSaveModal, setShowSaveModal, showPetList, setShowPetList, 
-    showAchievementModal, setShowAchievementModal,
-    showCharacterModal, setShowCharacterModal, showInventoryModal, setShowInventoryModal,
-    combatTarget, combatState, combatLog, combatEndingRef, combatResult, lastAction,
-    interactionTarget, interactionSource, knownLocations,
-    worldRegistry, // Grab registry to find exits
-    handleSend,
-    handleQuickSave, handleQuickLoad, handleExportSave, handleImportSave,
-    handleEntityClick, handleInventoryItemClick, closeInteraction,
-    handlePickup, handleDropItem, handleUseItem, startCombatFromOverlay, handleObserveItem, handleObserveMonster,
-    closeCombat, handlePlayerAttack, handlePlayerSkill, handlePlayerDefend, handleContract, handlePlayerEscape,
-    handlePetAttack, handlePetSkill, handlePetDefend,
-    handleSwitchPet, handleRecallPet, handleEnhancePet, handleReleasePet,
-    equipTitle, equipItem, unequipItem
-  } = useGame();
-
-  const [activeActionCategory, setActiveActionCategory] = useState<ActionCategory>('explore');
-  const [showMobileSidebar, setShowMobileSidebar] = useState(false); // Mobile Drawer State
-
-  // Get current location data for exits
-  const currentLocationData = worldRegistry[stats.locationId] || Object.values(worldRegistry).find((l: LocationData) => l.name === stats.location);
+export default function App() {
+  const [activeTab, setActiveTab] = useState<'learn' | 'practice' | 'library'>('learn');
 
   return (
-    // Fixed inset-0 for app-like experience on mobile (no scrolling the body)
-    <div className="fixed inset-0 bg-[#050b14] flex flex-col font-['Noto_Sans_SC'] selection:bg-teal-500/30 overflow-hidden">
-      
-      <SettingsModal 
-         isOpen={showSettings} onClose={() => setShowSettings(false)} initialized={initialized}
-      />
-      <SaveLoadModal 
-         isOpen={showSaveModal} onClose={() => setShowSaveModal(false)} stats={stats} onQuickSave={handleQuickSave} onQuickLoad={handleQuickLoad} onExportSave={handleExportSave} onImportSave={handleImportSave} initialized={initialized}
-      />
-      {showPetList && (
-          <PetListOverlay 
-             ownedPets={stats.ownedPets || []} 
-             activePet={stats.pet} 
-             onClose={() => setShowPetList(false)} 
-             onSummon={handleSwitchPet} 
-             onRecall={handleRecallPet}
-             onEnhance={handleEnhancePet} 
-             onRelease={handleReleasePet}
-          />
-      )}
-      {showAchievementModal && (
-          <AchievementOverlay achievements={stats.achievements || []} unlockedTitles={stats.unlockedTitles || []} activeTitle={stats.activeTitle} onClose={() => setShowAchievementModal(false)} onEquipTitle={equipTitle} />
-      )}
-      {showCharacterModal && (
-          <CharacterModal stats={stats} onClose={() => setShowCharacterModal(false)} onUnequip={unequipItem} />
-      )}
-      {showInventoryModal && (
-          <InventoryModal inventory={stats.inventory} onClose={() => setShowInventoryModal(false)} onUse={handleUseItem} onEquip={equipItem} onDrop={handleDropItem} />
-      )}
-
-      {combatTarget && (
-        <CombatOverlay 
-            combatTarget={combatTarget} 
-            combatState={combatState} 
-            stats={stats} 
-            combatLog={combatLog} 
-            onClose={closeCombat} 
-            onAttack={handlePlayerAttack} 
-            onSkill={handlePlayerSkill} 
-            onDefend={handlePlayerDefend} 
-            onContract={handleContract} 
-            onEscape={handlePlayerEscape} 
-            onPetAttack={handlePetAttack} 
-            onPetSkill={handlePetSkill} 
-            onPetDefend={handlePetDefend} 
-            combatEnding={combatEndingRef.current}
-            combatResult={combatResult}
-            lastAction={lastAction}
-        />
-      )}
-
-      {interactionTarget && (
-        <InteractionOverlay 
-            target={interactionTarget} source={interactionSource} onClose={closeInteraction} quests={quests}
-            onUse={(e: Entity) => { handleSend(`使用物品 ${e.name}`); closeInteraction(); }} 
-            onDrop={() => handleDropItem()} 
-            onPickup={handlePickup} 
-            onObserveItem={handleObserveItem} 
-            onFight={startCombatFromOverlay} 
-            onObserveMonster={handleObserveMonster} 
-            onSneak={(e: Entity) => { handleSend(`尝试绕过 ${e.name}`); closeInteraction(); }} 
-            onTalk={(e: Entity) => { handleSend(`与 ${e.name} 交谈`); }} 
-            onTrade={(e: Entity) => { handleSend(`与 ${e.name} 交易`); closeInteraction(); }} 
-            onAcceptQuest={(qid) => { handleSend(`accept_quest ${qid}`); }} 
-            onSubmitQuest={(qid) => { handleSend(`submit_quest ${qid}`); }} 
-            onObserveNpc={(e: Entity) => { handleSend(`观察 ${e.name}`); closeInteraction(); }}
-        />
-      )}
-
-      {/* --- Main Layout --- */}
-      <div className="flex-1 flex flex-col max-w-7xl w-full mx-auto relative min-h-0">
-        
-        {/* Header */}
-        <header className="shrink-0 p-2 md:p-3 text-center relative border-b border-teal-900/30 bg-[#050b14] z-20 flex items-center justify-between">
-            {/* Left Spacer or Logo */}
-            <div className="w-10 md:w-0"></div>
-
-            <div className="flex flex-col items-center">
-                <h1 className="text-xl md:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-300 to-emerald-200 neon-text tracking-widest font-['Noto_Sans_SC']" style={{ textShadow: '0 0 20px rgba(20,184,166,0.5)'}}>
-                    幻兽战记
-                </h1>
-                <div className="flex justify-center items-center gap-2">
-                    <span className="text-[10px] text-gray-500 font-mono">OFFLINE MODE</span>
-                    {stats.activeTitle && (
-                        <span className="text-[9px] bg-blue-900/50 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded font-bold">
-                            [{stats.activeTitle.name}]
-                        </span>
-                    )}
-                </div>
+    <div className="min-h-screen bg-[#fdfbf7] text-slate-800 font-sans selection:bg-amber-100">
+      {/* Header */}
+      <header className="fixed top-0 left-0 right-0 bg-[#fdfbf7]/90 backdrop-blur-md z-50 transition-all duration-300 border-b border-transparent scrolled:border-slate-100">
+        <div className="max-w-5xl mx-auto px-4 h-16 md:h-20 flex items-center justify-between">
+          <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setActiveTab('learn')}>
+            <div className="w-9 h-9 md:w-10 md:h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white font-serif font-bold text-lg shadow-lg group-hover:scale-105 transition-transform duration-300">
+                易
             </div>
-
-            {/* Mobile Menu Button */}
+            <div className="flex flex-col">
+                <h1 className="font-serif font-bold text-lg md:text-xl tracking-wider text-slate-900 leading-none">梅花心易</h1>
+                <span className="text-[10px] text-slate-400 font-medium tracking-widest mt-1 uppercase">Mind I-Ching</span>
+            </div>
+          </div>
+          <nav className="flex gap-1 bg-white/50 p-1.5 rounded-full border border-slate-200/50 shadow-sm backdrop-blur-sm">
             <button 
-                onClick={() => setShowMobileSidebar(true)}
-                className="lg:hidden text-teal-500 p-2 hover:bg-teal-900/20 rounded"
+                onClick={() => setActiveTab('learn')}
+                className={`px-3 md:px-5 py-2 rounded-full text-xs md:text-sm font-medium transition-all flex items-center gap-1.5 shrink-0 ${activeTab === 'learn' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}
             >
-                <Menu size={24} />
+                <BookOpen size={14} className="md:w-4 md:h-4" />
+                心法
             </button>
-        </header>
-
-        {/* Content Area */}
-        <div className="flex-1 flex min-h-0 relative">
-          
-          {/* Main Game Area */}
-          <div className="flex-1 flex flex-col min-w-0 bg-[#0B1120] lg:border-r border-teal-500/30 relative">
-            
-            {/* Location Header (New) */}
-            <div className="w-full bg-[#0f172a] border-b border-teal-500/30 p-4 relative overflow-hidden shrink-0">
-                 {/* Decorative background element */}
-                 <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gradient-to-l from-teal-900/10 to-transparent pointer-events-none"></div>
-                 <div className="absolute -right-4 -top-4 opacity-5 pointer-events-none">
-                    <MapPin size={120} />
-                 </div>
-                 
-                 <div className="relative z-10 flex flex-col">
-                     <div className="flex items-end gap-3 mb-2">
-                         <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-200 to-emerald-400 font-['Noto_Sans_SC'] shadow-black drop-shadow-lg leading-none">
-                             {stats.location}
-                         </h2>
-                         {currentLocationData?.dangerLevel && (
-                             <div className="flex items-center gap-1.5 px-2 py-0.5 bg-black/40 border border-red-500/30 rounded backdrop-blur-sm self-center">
-                                 <ShieldAlert size={12} className="text-red-500" />
-                                 <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">
-                                     {currentLocationData.dangerLevel}
-                                 </span>
-                             </div>
-                         )}
-                     </div>
-                     <div className="flex items-start gap-2">
-                        <Sparkles size={12} className="text-teal-500/60 mt-0.5 shrink-0"/>
-                        <p className="text-xs text-gray-400 max-w-2xl line-clamp-2">
-                            {currentLocationData?.description || "区域信息加载中..."}
-                        </p>
-                     </div>
-                 </div>
-            </div>
-
-            {/* Entity Grid */}
-            <div className="p-2 border-b border-teal-500/10 bg-[#0f172a]/50">
-               <EntityGrid entities={entities} onEntityClick={handleEntityClick} />
-            </div>
-
-            {/* Logs */}
-            <LogViewer logs={logs} isLoading={isLoading} streamText={streamText} />
-
-            {/* Actions (Now contains Map) */}
-            <ActionPanel 
-                activeCategory={activeActionCategory} setActiveCategory={setActiveActionCategory} onAction={handleSend} onShowSettings={() => setShowSettings(true)} 
-                currentExits={currentLocationData?.visibleExits} 
-                currentLocation={stats.location} 
-                isLoading={isLoading} 
-                worldRegistry={worldRegistry}
-                currentLocationId={currentLocationData?.id || stats.locationId}
-                onOpenPetList={() => setShowPetList(true)} onQuickSummon={() => setShowPetList(true)}
-                onOpenAchievements={() => setShowAchievementModal(true)}
-                onOpenCharacter={() => setShowCharacterModal(true)}
-                onOpenInventory={() => setShowInventoryModal(true)}
-            />
-          </div>
-
-          {/* Desktop Sidebar (Visible on Large Screens) */}
-          <div className="hidden lg:block w-80 bg-[#050b14] border-l border-teal-500/20 p-4 overflow-y-auto custom-scrollbar">
-            <Sidebar stats={stats} quests={quests} onItemClick={handleInventoryItemClick} />
-          </div>
-
-          {/* Mobile Sidebar Overlay (Drawer) */}
-          {showMobileSidebar && (
-              <div className="fixed inset-0 z-40 lg:hidden">
-                  <div className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-fade-in" onClick={() => setShowMobileSidebar(false)}></div>
-                  <div className="absolute right-0 top-0 bottom-0 w-80 max-w-[80%] bg-[#0B1120] border-l border-teal-500/30 shadow-2xl animate-slide-in-right">
-                      <Sidebar stats={stats} quests={quests} onItemClick={(item) => { handleInventoryItemClick(item); setShowMobileSidebar(false); }} onClose={() => setShowMobileSidebar(false)} />
-                  </div>
-              </div>
-          )}
-
+            <button 
+                onClick={() => setActiveTab('library')}
+                className={`px-3 md:px-5 py-2 rounded-full text-xs md:text-sm font-medium transition-all flex items-center gap-1.5 shrink-0 ${activeTab === 'library' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}
+            >
+                <Library size={14} className="md:w-4 md:h-4" />
+                卦典
+            </button>
+            <button 
+                onClick={() => setActiveTab('practice')}
+                className={`px-3 md:px-5 py-2 rounded-full text-xs md:text-sm font-medium transition-all flex items-center gap-1.5 shrink-0 ${activeTab === 'practice' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}
+            >
+                <Compass size={14} className="md:w-4 md:h-4" />
+                演练
+            </button>
+          </nav>
         </div>
-      </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="pt-24 md:pt-32 px-4 pb-20 max-w-5xl mx-auto min-h-screen">
+        {activeTab === 'learn' && (
+             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                 <div className="text-center mb-10 md:mb-16">
+                     <h2 className="text-3xl md:text-4xl font-serif font-bold text-slate-900 mb-6">万物皆有数，心动即天机</h2>
+                     <p className="text-slate-500 text-base md:text-lg max-w-2xl mx-auto leading-relaxed font-serif">
+                        梅花易数不仅是一门预测术，更是一种观察世界的视角。<br className="hidden md:block"/>在这里，我们剥离复杂的迷信，回归纯粹的易理逻辑。
+                     </p>
+                 </div>
+                 <Roadmap />
+                 <div className="mt-12 text-center pb-10">
+                    <button 
+                        onClick={() => setActiveTab('practice')}
+                        className="bg-slate-900 text-white px-10 py-4 rounded-full font-bold shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all active:scale-95 text-lg"
+                    >
+                        开始起卦实践
+                    </button>
+                 </div>
+             </div>
+        )}
+        
+        {activeTab === 'library' && (
+             <div className="animate-in fade-in zoom-in-95 duration-300">
+                <HexagramLib />
+             </div>
+        )}
+
+        {activeTab === 'practice' && (
+            <div className="animate-in fade-in zoom-in-95 duration-300">
+                <DivinationTool />
+            </div>
+        )}
+      </main>
+      
+      {/* Footer */}
+      <footer className="py-8 text-center border-t border-slate-200/50 mt-auto bg-[#fdfbf7]">
+        <p className="text-slate-400 text-xs font-serif tracking-widest">梅花心易 © 2024 · 善易者不卜</p>
+      </footer>
     </div>
   );
-};
-export default App;
+}
