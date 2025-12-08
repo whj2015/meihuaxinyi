@@ -1,10 +1,12 @@
+
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { calculateDivination } from '../utils/meiHuaLogic';
 import { DivinationResult, AIProvider, UserProfile, CustomAIConfig, HistoryRecord } from '../types';
 import HexagramVisual from './HexagramVisual';
 import { getInterpretation } from '../services/geminiService';
-import { Sparkles, ArrowRight, RefreshCcw, Settings, X, Check, User, LogOut, Gift, RotateCcw, Save, Loader2, Quote, BookOpen, Activity, UserCircle, Briefcase, GitCommit, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, MoveHorizontal, MessageCircle, Hash, History, Clock, CreditCard, Trash2, AlertTriangle } from 'lucide-react';
+import AuthModal from './AuthModal';
+import { Sparkles, ArrowRight, RefreshCcw, Settings, X, Check, User, LogOut, Gift, RotateCcw, Save, Loader2, Quote, BookOpen, Activity, UserCircle, Briefcase, GitCommit, ChevronRight, ArrowLeft, ArrowUp, ArrowDown, MoveHorizontal, MessageCircle, Hash, History, Clock, CreditCard, Trash2, AlertTriangle, LogIn, Lock, CheckCircle, XCircle, Compass } from 'lucide-react';
 
 // --- Markdown Renderer ---
 const FormattedMarkdown: React.FC<{ text: string }> = ({ text }) => {
@@ -69,16 +71,14 @@ const DivinationTool: React.FC = () => {
 
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false); 
+  const [showLoginModal, setShowLoginModal] = useState(false);
+
   const [provider, setProvider] = useState<AIProvider>('deepseek'); 
   
   const [guestApiKeys, setGuestApiKeys] = useState({ gemini: '', deepseek: '' });
   const [customConfig, setCustomConfig] = useState<CustomAIConfig>({ apiKey: '', baseUrl: '', modelName: '' });
 
   const [user, setUser] = useState<UserProfile>({ username: '', isLoggedIn: false });
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [authForm, setAuthForm] = useState({ username: '', password: '' });
-  const [isAuthProcessing, setIsAuthProcessing] = useState(false);
-  const [authMessage, setAuthMessage] = useState({ text: '', type: '' as 'success' | 'error' | '' });
   const [isSavingKeys, setIsSavingKeys] = useState(false);
 
   // History State
@@ -141,83 +141,14 @@ const DivinationTool: React.FC = () => {
       }
   };
 
-  const validateAuthInput = (): string | null => {
-      const { username, password } = authForm;
-      if (!username || !password) return '请输入用户名和密码';
-      if (username.length < 3) return '用户名至少 3 个字符';
-      if (username.length > 20) return '用户名过长';
-      if (authMode === 'register') {
-          if (password.length < 6) return '密码至少 6 位，请设置更安全的密码';
-          const usernameRegex = /^[\u4e00-\u9fa5a-zA-Z0-9_]+$/;
-          if (!usernameRegex.test(username)) return '用户名仅支持中文、字母、数字和下划线';
-      }
-      return null;
-  };
-
-  const handleAuth = async () => {
-    const errorMsg = validateAuthInput();
-    if (errorMsg) {
-        setAuthMessage({ text: errorMsg, type: 'error' });
-        return;
-    }
-
-    setIsAuthProcessing(true);
-    setAuthMessage({ text: '', type: '' });
-
-    const endpoint = authMode === 'login' ? '/api/login' : '/api/register';
-
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(authForm)
-      });
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        if (authMode === 'register') {
-             // 注册成功后自动登录
-             const loginRes = await fetch('/api/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(authForm)
-            });
-            const loginData = await loginRes.json();
-            if (loginData.success) processLoginSuccess(loginData);
-        } else {
-            processLoginSuccess(data);
-        }
-      } else {
-        setAuthMessage({ text: data.message || '操作失败', type: 'error' });
-      }
-    } catch (error) {
-      setAuthMessage({ text: '网络错误，请稍后重试', type: 'error' });
-    } finally {
-      setIsAuthProcessing(false);
-    }
-  };
-
-  const handleAuthKeyDown = (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') handleAuth();
-  };
-
-  const processLoginSuccess = (data: any) => {
-    const newUser = { 
-        username: data.username, 
-        isLoggedIn: true,
-        credits: data.credits,
-        token: data.token // 存储 JWT Token
-    };
-    setUser(newUser);
-    localStorage.setItem('user_profile', JSON.stringify(newUser));
-    setAuthMessage({ text: '登录成功', type: 'success' });
-    setGuestApiKeys({ gemini: '', deepseek: '' });
+  const handleLoginSuccess = (newUser: UserProfile) => {
+      setUser(newUser);
+      setGuestApiKeys({ gemini: '', deepseek: '' });
   };
 
   const handleLogout = () => {
     setUser({ username: '', isLoggedIn: false });
     localStorage.removeItem('user_profile');
-    setAuthForm({ username: '', password: '' });
   };
 
   const handleRecharge = async () => {
@@ -276,59 +207,45 @@ const DivinationTool: React.FC = () => {
   };
 
   const saveHistory = async (q: string, n1: number, n2: number, n3: number) => {
+      if (!user.isLoggedIn) return;
       const timestamp = Date.now();
       
-      if (user.isLoggedIn) {
-          try {
-              const res = await fetch('/api/history', {
-                  method: 'POST',
-                  headers: { 
-                      'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${user.token}`
-                  },
-                  body: JSON.stringify({ question: q, n1, n2, n3, timestamp })
-              });
-              const data = await res.json();
-              if (data.success) {
-                  setCurrentRecordId(data.id);
-                  const newRecord: HistoryRecord = { id: data.id, username: user.username, question: q, n1, n2, n3, timestamp };
-                  setHistoryList(prev => [newRecord, ...prev]);
-              }
-          } catch (e) { console.error("Save history failed", e); }
-      } else {
-          const tempId = `guest-${timestamp}`;
-          setCurrentRecordId(tempId);
-          const newRecord: HistoryRecord = { id: tempId, question: q, n1, n2, n3, timestamp };
-          setHistoryList(prev => [newRecord, ...prev]);
-      }
+      try {
+          const res = await fetch('/api/history', {
+              method: 'POST',
+              headers: { 
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${user.token}`
+              },
+              body: JSON.stringify({ question: q, n1, n2, n3, timestamp })
+          });
+          const data = await res.json();
+          if (data.success) {
+              setCurrentRecordId(data.id);
+              const newRecord: HistoryRecord = { id: data.id, username: user.username, question: q, n1, n2, n3, timestamp };
+              setHistoryList(prev => [newRecord, ...prev]);
+          }
+      } catch (e) { console.error("Save history failed", e); }
   };
 
   const updateHistoryAI = async (text: string) => {
-      if (!currentRecordId) return;
+      if (!currentRecordId || !user.isLoggedIn) return;
       setHistoryList(prev => prev.map(item => item.id === currentRecordId ? { ...item, ai_response: text } : item));
-      if (user.isLoggedIn) {
-           try {
-              await fetch('/api/history', {
-                  method: 'PUT',
-                  headers: { 
-                      'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${user.token}`
-                  },
-                  body: JSON.stringify({ id: currentRecordId, ai_response: text })
-              });
-           } catch(e) { console.error("Update AI history failed", e); }
-      }
+       try {
+          await fetch('/api/history', {
+              method: 'PUT',
+              headers: { 
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${user.token}`
+              },
+              body: JSON.stringify({ id: currentRecordId, ai_response: text })
+          });
+       } catch(e) { console.error("Update AI history failed", e); }
   };
 
   const handleDeleteHistory = async (id: number | string) => {
-      // 1. 如果是访客，直接前端删除
-      if (!user.isLoggedIn) {
-          setHistoryList(prev => prev.filter(item => item.id !== id));
-          setDeletingId(null);
-          return;
-      }
+      if (!user.isLoggedIn) return;
 
-      // 2. 如果是登录用户，请求后端删除
       try {
           const res = await fetch('/api/history', {
               method: 'DELETE',
@@ -376,7 +293,6 @@ const DivinationTool: React.FC = () => {
     const n2 = Math.floor(Math.random() * 800) + 100;
     const n3 = Math.floor(Math.random() * 800) + 100;
     
-    // Clear previous results but keep inputs filled instantly
     setQuestion('');
     setResult(null);
     setAiInterpretation(null);
@@ -395,7 +311,6 @@ const DivinationTool: React.FC = () => {
         return;
     }
     
-    // Close keyboard on mobile
     (document.activeElement as HTMLElement)?.blur();
 
     const res = calculateDivination(n1, n2, n3);
@@ -485,6 +400,60 @@ const DivinationTool: React.FC = () => {
       relationVisual = getRelationVisual(result.relationScore);
   }
   
+  // --- Render Auth Guard for Unlogged Users (Unified UI Style) ---
+  if (!user.isLoggedIn) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 md:py-20 animate-in fade-in zoom-in-95 duration-500 px-4">
+             {/* Unified Auth Modal */}
+             <AuthModal 
+                isOpen={showLoginModal} 
+                onClose={() => setShowLoginModal(false)}
+                onSuccess={handleLoginSuccess}
+             />
+
+            <div className="relative group cursor-pointer" onClick={() => setShowLoginModal(true)}>
+                <div className="absolute inset-0 bg-slate-200 rounded-full blur-2xl opacity-0 group-hover:opacity-40 transition-opacity duration-500"></div>
+                
+                <button className="relative w-48 h-48 md:w-56 md:h-56 bg-white rounded-full border-4 border-slate-100 shadow-xl flex flex-col items-center justify-center gap-2 transition-all duration-300 hover:scale-105 active:scale-95 group-hover:border-slate-200">
+                    
+                    {/* Locked Overlay */}
+                    <div className="absolute top-3 right-3 w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 shadow-sm border border-slate-200 z-10">
+                        <Lock size={14}/>
+                    </div>
+
+                    <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center shadow-inner mb-2 transition-colors group-hover:bg-slate-200 group-hover:text-slate-600">
+                        <Compass size={32} />
+                    </div>
+                    <div className="text-center px-4">
+                        <div className="font-serif font-bold text-slate-800 text-lg md:text-xl group-hover:text-slate-900">
+                            登录开启
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-sans tracking-widest uppercase mt-1 group-hover:text-slate-500 transition-colors">
+                            Digital Divination
+                        </div>
+                    </div>
+                </button>
+            </div>
+            
+            <div className="mt-12 text-center max-w-sm mx-auto px-4">
+                <h3 className="text-slate-800 font-serif font-bold mb-2">万物皆数，感而遂通</h3>
+                <p className="text-sm text-slate-500 leading-relaxed mb-6">
+                    心诚则灵，数字中蕴含着当下的天机。<br/>
+                    登录后即可开启起卦功能，并保存您的专属档案。
+                </p>
+                
+                <div className="flex flex-col items-center gap-2">
+                    <button onClick={() => setShowLoginModal(true)} className="px-6 py-2 bg-slate-900 text-white text-xs font-bold rounded-full shadow-lg hover:bg-slate-800 transition-all flex items-center gap-2">
+                         <User size={14}/> 账号登录 / 注册
+                    </button>
+                    <p className="text-[10px] text-slate-400 mt-2">云端同步 · 隐私加密</p>
+                </div>
+            </div>
+        </div>
+      );
+  }
+
+  // --- Render Main Tool (Logged In) ---
   return (
       <div className="w-full space-y-8 relative">
            {/* Settings Modal */}
@@ -499,64 +468,23 @@ const DivinationTool: React.FC = () => {
             
             <div className="overflow-y-auto no-scrollbar flex-1 overscroll-contain bg-slate-50/50">
                 <div className="p-6 bg-white m-4 rounded-xl shadow-sm border border-slate-100">
-                    {!user.isLoggedIn ? (
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between mb-2">
-                                <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2"><User size={16} /> 账号登录</h4>
-                                <div className="flex bg-slate-100 p-1 rounded-lg">
-                                    <button onClick={()=>{setAuthMode('login');setAuthMessage({text:'',type:''})}} className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${authMode==='login'?'bg-white text-slate-900 shadow-sm':'text-slate-400'}`}>登录</button>
-                                    <button onClick={()=>{setAuthMode('register');setAuthMessage({text:'',type:''})}} className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${authMode==='register'?'bg-white text-slate-900 shadow-sm':'text-slate-400'}`}>注册</button>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-slate-900 text-white rounded-full flex items-center justify-center font-bold text-xl shadow-md">{user.username.charAt(0).toUpperCase()}</div>
+                            <div>
+                                <p className="font-bold text-slate-900">{user.username}</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${credits>0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+                                        解卦点数: {credits}
+                                    </span>
+                                    <button onClick={handleRecharge} className="bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 transition-colors">
+                                        <CreditCard size={10}/> 充值
+                                    </button>
                                 </div>
                             </div>
-                            <div className="space-y-3">
-                                <input 
-                                    type="text" 
-                                    placeholder="用户名" 
-                                    value={authForm.username} 
-                                    onChange={e=>setAuthForm({...authForm,username:e.target.value})} 
-                                    onKeyDown={handleAuthKeyDown}
-                                    className="w-full p-3 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400 transition-all"
-                                />
-                                <input 
-                                    type="password" 
-                                    placeholder={authMode === 'register' ? "密码 (至少6位)" : "密码"}
-                                    value={authForm.password} 
-                                    onChange={e=>setAuthForm({...authForm,password:e.target.value})} 
-                                    onKeyDown={handleAuthKeyDown}
-                                    className="w-full p-3 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-400 transition-all"
-                                />
-                                {authMessage.text && (
-                                    <div className={`text-xs px-2 py-1 ${authMessage.type === 'error' ? 'text-red-500' : 'text-green-500'}`}>
-                                        {authMessage.text}
-                                    </div>
-                                )}
-                            </div>
-                            <button onClick={handleAuth} disabled={isAuthProcessing} className="w-full py-3 bg-slate-900 text-white text-sm font-bold rounded-xl shadow-lg shadow-slate-200 hover:bg-slate-800 active:scale-[0.98] transition-all">
-                                {isAuthProcessing?<Loader2 size={16} className="animate-spin mx-auto"/>:(authMode==='login'?'立即登录':'注册并登录')}
-                            </button>
-                            <div className="bg-amber-50 text-amber-800 text-xs p-3 rounded-lg flex items-center gap-2 border border-amber-100">
-                                <Gift size={14}/> 注册登录即可获赠 5 点大师解卦点数
-                            </div>
                         </div>
-                    ) : (
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-slate-900 text-white rounded-full flex items-center justify-center font-bold text-xl shadow-md">{user.username.charAt(0).toUpperCase()}</div>
-                                <div>
-                                    <p className="font-bold text-slate-900">{user.username}</p>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${credits>0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
-                                            解卦点数: {credits}
-                                        </span>
-                                        <button onClick={handleRecharge} className="bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 transition-colors">
-                                            <CreditCard size={10}/> 充值
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            <button onClick={handleLogout} className="text-xs border border-slate-200 px-3 py-2 rounded-lg bg-white hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-colors flex items-center gap-2 font-medium"><LogOut size={14}/> 退出</button>
-                        </div>
-                    )}
+                        <button onClick={handleLogout} className="text-xs border border-slate-200 px-3 py-2 rounded-lg bg-white hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-colors flex items-center gap-2 font-medium"><LogOut size={14}/> 退出</button>
+                    </div>
                 </div>
 
                 <div className="p-6 m-4 mt-0 bg-white rounded-xl shadow-sm border border-slate-100 space-y-6">
@@ -776,13 +704,10 @@ const DivinationTool: React.FC = () => {
       {/* History Sidebar */}
       {showHistory && createPortal(
           <>
-            {/* Backdrop - Separate div to ensure click handling is clean */}
             <div 
                 className="fixed inset-0 z-[140] bg-slate-900/30 backdrop-blur-sm animate-in fade-in duration-300"
                 onClick={() => setShowHistory(false)}
             />
-            
-            {/* Drawer */}
             <div className="fixed inset-y-0 right-0 z-[150] w-full md:w-96 bg-white shadow-2xl border-l border-slate-100 flex flex-col h-[100dvh] animate-in slide-in-from-right duration-300 sm:duration-500">
                   <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white/80 backdrop-blur-md sticky top-0 z-10 shrink-0">
                       <h3 className="font-serif font-bold text-slate-800 flex items-center gap-2">
@@ -793,7 +718,6 @@ const DivinationTool: React.FC = () => {
                       </button>
                   </div>
                   
-                  {/* List Content */}
                   <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar overscroll-contain pb-20">
                       {historyList.length === 0 ? (
                           <div className="text-center py-20 text-slate-400 text-sm">

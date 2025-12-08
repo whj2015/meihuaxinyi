@@ -2,10 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { calculateDivination } from '../utils/meiHuaLogic';
-import { DivinationResult, AIProvider } from '../types';
+import { DivinationResult, AIProvider, UserProfile } from '../types';
 import { getDailyGuidance } from '../services/geminiService';
 import HexagramVisual from './HexagramVisual';
-import { Sparkles, Sun, CheckCircle, XCircle, Calendar, Star, History, X, ChevronRight, ArrowUp, ArrowDown, MoveHorizontal, GitCommit, ChevronLeft } from 'lucide-react';
+import AuthModal from './AuthModal';
+import { Sparkles, Sun, CheckCircle, XCircle, Calendar, Star, History, X, ChevronRight, ArrowUp, ArrowDown, MoveHorizontal, GitCommit, ChevronLeft, Lock, User, Loader2, LogIn, ArrowRight } from 'lucide-react';
 
 interface DailyData {
   date: string; // YYYY-MM-DD
@@ -20,15 +21,16 @@ const DailyDivination: React.FC = () => {
   const [dailyData, setDailyData] = useState<DailyData | null>(null);
   const [historyList, setHistoryList] = useState<DailyData[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   
   const [isAnimating, setIsAnimating] = useState(false);
   const [loadingAI, setLoadingAI] = useState(false);
   const [animationStep, setAnimationStep] = useState(0); // 0: Idle, 1: Breathing, 2: Revealing
 
-  // Config retrieval
+  // Config & User
   const [provider, setProvider] = useState<AIProvider>('deepseek');
   const [guestApiKeys, setGuestApiKeys] = useState({ gemini: '', deepseek: '' });
-  const [user, setUser] = useState<any>({ isLoggedIn: false });
+  const [user, setUser] = useState<UserProfile>({ isLoggedIn: false, username: '' });
 
   useEffect(() => {
     // Load User & Config
@@ -70,6 +72,18 @@ const DailyDivination: React.FC = () => {
       const newList = [data, ...filtered];
       localStorage.setItem(HISTORY_KEY, JSON.stringify(newList));
       setHistoryList(newList);
+  };
+
+  const handleLoginSuccess = (newUser: UserProfile) => {
+      setUser(newUser);
+  };
+
+  const handleStartClick = () => {
+      if (!user.isLoggedIn) {
+          setShowLoginModal(true);
+      } else {
+          startDivination();
+      }
   };
 
   const startDivination = async () => {
@@ -171,15 +185,22 @@ const DailyDivination: React.FC = () => {
      const isToday = date === new Date().toISOString().split('T')[0];
 
      return (
-        <div className="max-w-3xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-700 pb-12">
+        <div className="max-w-3xl mx-auto space-y-5 animate-in fade-in slide-in-from-bottom-8 duration-700 pb-20">
+             {/* Unified Auth Modal */}
+             <AuthModal 
+                isOpen={showLoginModal} 
+                onClose={() => setShowLoginModal(false)}
+                onSuccess={handleLoginSuccess}
+             />
+
              {/* Header Actions */}
-             <div className="flex justify-between items-center px-2">
+             <div className="flex justify-between items-center px-4 md:px-2 pt-2">
                  {isToday ? (
-                     <span className="inline-flex items-center gap-2 text-xs text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-100 font-bold">
+                     <span className="inline-flex items-center gap-2 text-xs text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-100 font-bold shadow-sm">
                         <Sun size={12}/> 今日运势已生成
                      </span>
                  ) : (
-                     <span className="inline-flex items-center gap-2 text-xs text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full font-bold">
+                     <span className="inline-flex items-center gap-2 text-xs text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full font-bold shadow-sm">
                         <History size={12}/> 历史回溯：{date}
                      </span>
                  )}
@@ -188,108 +209,115 @@ const DailyDivination: React.FC = () => {
                  </button>
              </div>
 
-             {/* 1. Luck Card */}
-             <div className="bg-white rounded-[2rem] p-6 md:p-8 shadow-sm border border-slate-100/60 relative overflow-hidden group">
-                <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-amber-50 to-transparent rounded-bl-[100px] -z-10 transition-transform duration-1000 group-hover:scale-110"></div>
-                <div className="flex justify-between items-start mb-6">
-                    <div>
-                        <h2 className="text-2xl font-serif font-bold text-slate-900">{formatDate(date)}</h2>
-                        <div className="flex gap-2 mt-2">
-                             {guidance.keywords?.map((k: string, i: number) => (
-                                 <span key={i} className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 px-2 py-0.5 rounded border border-slate-100">#{k}</span>
-                             ))}
-                         </div>
-                    </div>
-                    <div className="flex flex-col items-end">
-                        <div className="text-4xl font-serif font-bold text-slate-800">{guidance.score}<span className="text-sm text-slate-400 font-sans font-normal ml-1">/100</span></div>
-                        <div className="flex gap-1 mt-1">
-                             {[...Array(5)].map((_, i) => (
-                                 <Star key={i} size={12} className={i < Math.round(guidance.score / 20) ? "text-amber-400 fill-amber-400" : "text-slate-200"} />
-                             ))}
+             {/* 1. Luck Card (Mobile Optimized) */}
+             <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden relative group">
+                {/* Decorative Background */}
+                <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-amber-50/80 to-transparent rounded-bl-[100px] -z-0"></div>
+                
+                <div className="p-6 md:p-8 relative z-10">
+                    <div className="flex justify-between items-start mb-6">
+                        <div>
+                            <h2 className="text-lg md:text-2xl font-serif font-bold text-slate-900 flex flex-col md:block">
+                                <span>{formatDate(date)}</span>
+                            </h2>
+                            <div className="flex flex-wrap gap-2 mt-2">
+                                {guidance.keywords?.map((k: string, i: number) => (
+                                    <span key={i} className="text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-white/60 px-2 py-0.5 rounded border border-slate-200/50 backdrop-blur-sm">#{k}</span>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="flex flex-col items-end">
+                            <div className="text-5xl font-serif font-bold text-slate-800 leading-none">{guidance.score}<span className="text-xs text-slate-400 font-sans font-normal ml-1 align-top mt-2 inline-block">分</span></div>
                         </div>
                     </div>
-                </div>
 
-                <div className="p-4 bg-[#fbfbf9] rounded-2xl border border-slate-100/80 mb-6 shadow-[inset_0_2px_4px_rgba(0,0,0,0.01)]">
-                     <p className="font-serif text-lg text-slate-700 leading-relaxed text-center">
-                         “{guidance.summary}”
-                     </p>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                     <div className="space-y-2">
-                         <h4 className="text-xs font-bold text-slate-400 flex items-center gap-1"><CheckCircle size={12} className="text-green-500"/> 宜</h4>
-                         <div className="flex flex-wrap gap-2">
-                             {guidance.todo?.map((t: string, i: number) => (
-                                 <span key={i} className="px-2.5 py-1 bg-green-50 text-green-700 text-xs rounded-lg border border-green-100 font-medium">{t}</span>
-                             ))}
-                         </div>
-                     </div>
-                     <div className="space-y-2">
-                         <h4 className="text-xs font-bold text-slate-400 flex items-center gap-1"><XCircle size={12} className="text-red-500"/> 忌</h4>
-                         <div className="flex flex-wrap gap-2">
-                             {guidance.not_todo?.map((t: string, i: number) => (
-                                 <span key={i} className="px-2.5 py-1 bg-red-50 text-red-700 text-xs rounded-lg border border-red-100 font-medium">{t}</span>
-                             ))}
-                         </div>
-                     </div>
-                </div>
+                    <div className="p-5 bg-[#fbfbf9] rounded-2xl border border-slate-100/80 mb-6 relative">
+                        <span className="absolute -top-3 left-4 bg-white px-2 text-amber-500"><Sparkles size={16}/></span>
+                        <p className="font-serif text-lg md:text-xl text-slate-800 leading-relaxed text-center font-medium">
+                            “{guidance.summary}”
+                        </p>
+                    </div>
+                    
+                    <div className="flex flex-col md:flex-row gap-4 mb-6">
+                        <div className="flex-1 space-y-2">
+                            <div className="flex items-center gap-2">
+                                <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-600"><CheckCircle size={12}/></div>
+                                <span className="text-xs font-bold text-slate-400">宜</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {guidance.todo?.map((t: string, i: number) => (
+                                    <span key={i} className="px-3 py-1.5 bg-green-50 text-green-800 text-xs rounded-lg border border-green-100/50 font-medium">{t}</span>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="flex-1 space-y-2">
+                            <div className="flex items-center gap-2">
+                                <div className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center text-red-600"><XCircle size={12}/></div>
+                                <span className="text-xs font-bold text-slate-400">忌</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {guidance.not_todo?.map((t: string, i: number) => (
+                                    <span key={i} className="px-3 py-1.5 bg-red-50 text-red-800 text-xs rounded-lg border border-red-100/50 font-medium">{t}</span>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
 
-                <div className="border-t border-slate-100 pt-5">
-                    <h3 className="font-serif font-bold text-slate-800 mb-2 flex items-center gap-2 text-sm">
-                        <Sparkles size={14} className="text-amber-500"/> 大师指引
-                    </h3>
-                    <p className="text-slate-600 leading-7 text-justify text-sm">
-                        {guidance.fortune}
-                    </p>
+                    <div className="border-t border-slate-100 pt-5">
+                        <h3 className="font-serif font-bold text-slate-800 mb-3 flex items-center gap-2 text-sm">
+                             大师指引
+                        </h3>
+                        <p className="text-slate-600 leading-7 text-justify text-sm md:text-base">
+                            {guidance.fortune}
+                        </p>
+                    </div>
                 </div>
              </div>
 
-             {/* 2. Detailed Hexagram Flow (Same detailed view as DivinationTool) */}
-             <div className="bg-white rounded-[2rem] p-6 md:p-8 shadow-sm border border-slate-100/60">
-                 <div className="text-center mb-8">
-                     <h3 className="text-lg font-serif font-bold text-slate-800">卦象演变详解</h3>
-                     <p className="text-xs text-slate-400 mt-1">即使没有AI解读，观察本、互、变三卦亦可自明吉凶</p>
+             {/* 2. Detailed Hexagram Flow */}
+             <div className="bg-white rounded-[2rem] p-5 md:p-8 shadow-sm border border-slate-100/60">
+                 <div className="text-center mb-6 md:mb-8">
+                     <h3 className="text-base md:text-lg font-serif font-bold text-slate-800">卦象演变详解</h3>
                  </div>
                  
-                 <div className="flex flex-col md:flex-row items-stretch justify-center gap-8 md:gap-8">
+                 {/* Mobile: Vertical Stack, Desktop: Horizontal */}
+                 <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-8">
                     {/* Original */}
-                    <div className="flex-1 flex flex-col items-center group">
-                        <HexagramVisual hexagram={result.originalHexagram} label="本卦 · 现状" highlight={result.tiGua} movingLine={result.movingLine}/>
-                        <div className="mt-2 text-xs text-slate-400 font-mono">Start</div>
+                    <div className="flex flex-row md:flex-col items-center gap-4 md:gap-2 w-full md:w-auto justify-between md:justify-center p-3 md:p-0 bg-slate-50 md:bg-transparent rounded-xl md:rounded-none">
+                        <span className="md:hidden text-xs font-bold text-slate-500 w-12">本卦</span>
+                        <div className="scale-75 md:scale-100 origin-center"><HexagramVisual hexagram={result.originalHexagram} label="" highlight={result.tiGua} movingLine={result.movingLine}/></div>
+                        <span className="hidden md:block mt-2 text-xs text-slate-400 font-mono">Start</span>
                     </div>
                     
-                    {/* Arrow 1 */}
-                    <div className="flex md:flex-col items-center justify-center opacity-30">
-                        <div className="h-px w-full md:w-px md:h-20 bg-slate-400"></div>
-                        <ChevronRight className="md:rotate-90 text-slate-400 -ml-1 md:ml-0 md:-mt-1" size={16}/>
+                    <div className="hidden md:flex flex-col items-center justify-center opacity-30">
+                        <ChevronRight className="text-slate-400" size={16}/>
                     </div>
 
                     {/* Mutual */}
-                    <div className="flex-1 flex flex-col items-center group">
-                         <div className="relative">
-                            <HexagramVisual hexagram={result.huHexagram} label="互卦 · 过程"/>
+                    <div className="flex flex-row md:flex-col items-center gap-4 md:gap-2 w-full md:w-auto justify-between md:justify-center p-3 md:p-0 bg-slate-50 md:bg-transparent rounded-xl md:rounded-none">
+                         <span className="md:hidden text-xs font-bold text-slate-500 w-12">互卦</span>
+                         <div className="relative scale-75 md:scale-100 origin-center">
+                            <HexagramVisual hexagram={result.huHexagram} label=""/>
                             <div className="absolute -top-3 -right-3 w-6 h-6 bg-slate-50 rounded-full flex items-center justify-center border border-white shadow-sm text-slate-300"><GitCommit size={12}/></div>
                          </div>
-                         <div className="mt-2 text-xs text-slate-400 font-mono">Process</div>
+                         <span className="hidden md:block mt-2 text-xs text-slate-400 font-mono">Process</span>
                     </div>
 
-                    {/* Arrow 2 */}
-                    <div className="flex md:flex-col items-center justify-center opacity-30">
-                        <div className="h-px w-full md:w-px md:h-20 bg-slate-400"></div>
-                        <ChevronRight className="md:rotate-90 text-slate-400 -ml-1 md:ml-0 md:-mt-1" size={16}/>
+                    <div className="hidden md:flex flex-col items-center justify-center opacity-30">
+                        <ChevronRight className="text-slate-400" size={16}/>
                     </div>
 
                     {/* Changed */}
-                    <div className="flex-1 flex flex-col items-center group">
-                        <HexagramVisual hexagram={result.changedHexagram} label="变卦 · 结果"/>
-                        <div className="mt-2 text-xs text-slate-400 font-mono">End</div>
+                    <div className="flex flex-row md:flex-col items-center gap-4 md:gap-2 w-full md:w-auto justify-between md:justify-center p-3 md:p-0 bg-slate-50 md:bg-transparent rounded-xl md:rounded-none">
+                        <span className="md:hidden text-xs font-bold text-slate-500 w-12">变卦</span>
+                        <div className="scale-75 md:scale-100 origin-center"><HexagramVisual hexagram={result.changedHexagram} label=""/></div>
+                        <span className="hidden md:block mt-2 text-xs text-slate-400 font-mono">End</span>
                     </div>
                 </div>
              </div>
 
-             {/* 3. Relation Logic (Body vs Application) */}
-             <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-100 shadow-sm">
+             {/* 3. Relation Logic */}
+             <div className="bg-white p-5 md:p-8 rounded-[2rem] border border-slate-100 shadow-sm">
                  <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                      <div className="flex-1 w-full">
                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 text-center md:text-left">吉凶能量分析</h4>
@@ -308,7 +336,7 @@ const DailyDivination: React.FC = () => {
                              </div>
                          </div>
                      </div>
-                     <div className={`p-5 rounded-2xl border flex flex-col items-center justify-center min-w-[140px] w-full md:w-auto ${relationInfo.color}`}>
+                     <div className={`p-4 md:p-5 rounded-2xl border flex flex-col items-center justify-center w-full md:w-auto ${relationInfo.color}`}>
                          <span className="text-xs font-bold opacity-70 mb-1">综合判定</span>
                          <span className="text-2xl font-serif font-bold">{relationInfo.desc.split('·')[0]}</span>
                          <span className="text-[10px] opacity-80 mt-1">{relationInfo.desc.split('·')[1]}</span>
@@ -375,18 +403,42 @@ const DailyDivination: React.FC = () => {
      );
   }
 
-  // --- Render: Initial Phase ---
+  // --- Render: Initial Phase with Auth Guard ---
   return (
-    <div className="flex flex-col items-center justify-center py-12 md:py-20 animate-in fade-in zoom-in-95 duration-500">
-        <div className="relative group cursor-pointer" onClick={startDivination}>
-            <div className="absolute inset-0 bg-amber-200 rounded-full blur-2xl opacity-30 group-hover:opacity-60 transition-opacity duration-500"></div>
-            <button className="relative w-48 h-48 md:w-56 md:h-56 bg-white rounded-full border-4 border-slate-50 shadow-xl flex flex-col items-center justify-center gap-2 hover:scale-105 transition-transform duration-300 active:scale-95 group-hover:border-amber-100">
-                <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-inner mb-2 group-hover:bg-slate-800 transition-colors">
-                    <span className="font-serif text-4xl md:text-5xl font-bold select-none">卦</span>
+    <div className="flex flex-col items-center justify-center py-12 md:py-20 animate-in fade-in zoom-in-95 duration-500 px-4">
+        {/* Unified Auth Modal */}
+        <AuthModal 
+            isOpen={showLoginModal} 
+            onClose={() => setShowLoginModal(false)}
+            onSuccess={handleLoginSuccess}
+        />
+
+        <div className="relative group cursor-pointer" onClick={() => setShowLoginModal(true)}>
+            <div className={`absolute inset-0 bg-amber-200 rounded-full blur-2xl transition-opacity duration-500 ${user.isLoggedIn ? 'opacity-30 group-hover:opacity-60' : 'opacity-0'}`}></div>
+            
+            <button className={`relative w-48 h-48 md:w-56 md:h-56 bg-white rounded-full border-4 shadow-xl flex flex-col items-center justify-center gap-2 transition-all duration-300 ${user.isLoggedIn ? 'border-slate-50 hover:scale-105 active:scale-95 group-hover:border-amber-100' : 'border-slate-100 grayscale hover:grayscale-0'}`}>
+                
+                {/* Locked Overlay */}
+                {!user.isLoggedIn && (
+                    <div className="absolute top-3 right-3 w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 shadow-sm border border-slate-200 z-10">
+                        <Lock size={14}/>
+                    </div>
+                )}
+
+                <div className={`w-20 h-20 md:w-24 md:h-24 rounded-full text-white flex items-center justify-center shadow-inner mb-2 transition-colors ${user.isLoggedIn ? 'bg-slate-900 group-hover:bg-slate-800' : 'bg-slate-200'}`}>
+                    {user.isLoggedIn ? (
+                        <span className="font-serif text-4xl md:text-5xl font-bold select-none">卦</span>
+                    ) : (
+                        <LogIn size={32} className="text-slate-400"/>
+                    )}
                 </div>
-                <div className="text-center">
-                    <div className="font-serif font-bold text-slate-800 text-lg md:text-xl">今日一占</div>
-                    <div className="text-[10px] text-slate-400 font-sans tracking-widest uppercase mt-1 group-hover:text-amber-600 transition-colors">Daily Divination</div>
+                <div className="text-center px-4">
+                    <div className="font-serif font-bold text-slate-800 text-lg md:text-xl">
+                        {user.isLoggedIn ? '今日一占' : '登录解锁'}
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-sans tracking-widest uppercase mt-1 group-hover:text-amber-600 transition-colors">
+                        {user.isLoggedIn ? 'Daily Divination' : 'Login Required'}
+                    </div>
                 </div>
             </button>
         </div>
@@ -395,21 +447,31 @@ const DailyDivination: React.FC = () => {
             <h3 className="text-slate-800 font-serif font-bold mb-2">{formatDate(new Date().toISOString())}</h3>
             <p className="text-sm text-slate-500 leading-relaxed mb-6">
                 每日清晨，静心诚意。<br/>
-                抽取今日卦象，洞察气运流转，获取行事指引。
+                {user.isLoggedIn ? "抽取今日卦象，洞察气运流转。" : "天机珍贵，专属留存。登录后即可开启每日运势。"}
             </p>
-            <div className="flex gap-3 justify-center">
-                <div className="inline-flex items-center gap-2 text-xs text-amber-600 bg-amber-50 px-3 py-1 rounded-full border border-amber-100">
-                    <Calendar size={12}/> 每日限占一次
+            
+            {user.isLoggedIn ? (
+                <div className="flex gap-3 justify-center">
+                    <div className="inline-flex items-center gap-2 text-xs text-amber-600 bg-amber-50 px-3 py-1 rounded-full border border-amber-100">
+                        <Calendar size={12}/> 每日限占一次
+                    </div>
+                    {historyList.length > 0 && (
+                        <button onClick={() => setShowHistory(true)} className="inline-flex items-center gap-2 text-xs text-slate-500 hover:text-slate-800 bg-white hover:bg-slate-50 px-3 py-1 rounded-full border border-slate-200 transition-colors">
+                            <History size={12}/> 往期 ({historyList.length})
+                        </button>
+                    )}
                 </div>
-                {historyList.length > 0 && (
-                     <button onClick={() => setShowHistory(true)} className="inline-flex items-center gap-2 text-xs text-slate-500 hover:text-slate-800 bg-white hover:bg-slate-50 px-3 py-1 rounded-full border border-slate-200 transition-colors">
-                        <History size={12}/> 查看往期 ({historyList.length})
+            ) : (
+                <div className="flex flex-col items-center gap-2">
+                    <button onClick={() => setShowLoginModal(true)} className="px-6 py-2 bg-slate-900 text-white text-xs font-bold rounded-full shadow-lg hover:bg-slate-800 transition-all flex items-center gap-2">
+                         <User size={14}/> 账号登录 / 注册
                     </button>
-                )}
-            </div>
+                    <p className="text-[10px] text-slate-400 mt-2">云端同步 · 隐私加密</p>
+                </div>
+            )}
         </div>
 
-        {/* Re-using history sidebar logic for the initial screen as well */}
+        {/* Reuse History for Initial Screen */}
         {showHistory && createPortal(
                 <>
                     <div 

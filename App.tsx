@@ -7,14 +7,14 @@ import DailyDivination from './components/DailyDivination';
 import { BookOpen, Compass, Library, Sun } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'learn' | 'practice' | 'library' | 'daily'>('daily');
+  const [activeTab, setActiveTab] = useState<'learn' | 'practice' | 'library' | 'daily'>('learn');
 
   return (
     <div className="min-h-screen bg-[#fdfbf7] text-slate-800 font-sans selection:bg-amber-100">
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 bg-[#fdfbf7]/90 backdrop-blur-md z-50 transition-all duration-300 border-b border-transparent scrolled:border-slate-100">
         <div className="max-w-5xl mx-auto px-4 h-16 md:h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setActiveTab('daily')}>
+          <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setActiveTab('learn')}>
             <div className="w-9 h-9 md:w-10 md:h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white font-serif font-bold text-lg shadow-lg group-hover:scale-105 transition-transform duration-300">
                 易
             </div>
@@ -25,18 +25,11 @@ export default function App() {
           </div>
           <nav className="flex gap-1 bg-white/50 p-1.5 rounded-full border border-slate-200/50 shadow-sm backdrop-blur-sm overflow-x-auto no-scrollbar">
             <button 
-                onClick={() => setActiveTab('daily')}
-                className={`px-3 md:px-5 py-2 rounded-full text-xs md:text-sm font-medium transition-all flex items-center gap-1.5 shrink-0 ${activeTab === 'daily' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}
+                onClick={() => setActiveTab('learn')}
+                className={`px-3 md:px-5 py-2 rounded-full text-xs md:text-sm font-medium transition-all flex items-center gap-1.5 shrink-0 ${activeTab === 'learn' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}
             >
-                <Sun size={14} className="md:w-4 md:h-4" />
-                今日
-            </button>
-            <button 
-                onClick={() => setActiveTab('practice')}
-                className={`px-3 md:px-5 py-2 rounded-full text-xs md:text-sm font-medium transition-all flex items-center gap-1.5 shrink-0 ${activeTab === 'practice' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}
-            >
-                <Compass size={14} className="md:w-4 md:h-4" />
-                起卦
+                <BookOpen size={14} className="md:w-4 md:h-4" />
+                心法
             </button>
             <button 
                 onClick={() => setActiveTab('library')}
@@ -46,11 +39,18 @@ export default function App() {
                 卦典
             </button>
             <button 
-                onClick={() => setActiveTab('learn')}
-                className={`px-3 md:px-5 py-2 rounded-full text-xs md:text-sm font-medium transition-all flex items-center gap-1.5 shrink-0 ${activeTab === 'learn' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}
+                onClick={() => setActiveTab('practice')}
+                className={`px-3 md:px-5 py-2 rounded-full text-xs md:text-sm font-medium transition-all flex items-center gap-1.5 shrink-0 ${activeTab === 'practice' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}
             >
-                <BookOpen size={14} className="md:w-4 md:h-4" />
-                心法
+                <Compass size={14} className="md:w-4 md:h-4" />
+                起卦
+            </button>
+            <button 
+                onClick={() => setActiveTab('daily')}
+                className={`px-3 md:px-5 py-2 rounded-full text-xs md:text-sm font-medium transition-all flex items-center gap-1.5 shrink-0 ${activeTab === 'daily' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}
+            >
+                <Sun size={14} className="md:w-4 md:h-4" />
+                今日
             </button>
           </nav>
         </div>
