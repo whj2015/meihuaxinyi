@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { calculateDivination } from '../utils/meiHuaLogic';
@@ -323,12 +322,12 @@ const DailyDivination: React.FC = () => {
                      <h3 className="text-base md:text-lg font-serif font-bold text-slate-800">卦象演变详解</h3>
                  </div>
                  
-                 {/* Mobile: Vertical Stack, Desktop: Horizontal */}
+                 {/* Mobile: Vertical Stack, Desktop: Horizontal. REMOVED scale-75 hack. */}
                  <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-8">
                     {/* Original */}
                     <div className="flex flex-row md:flex-col items-center gap-4 md:gap-2 w-full md:w-auto justify-between md:justify-center p-3 md:p-0 bg-slate-50 md:bg-transparent rounded-xl md:rounded-none">
                         <span className="md:hidden text-xs font-bold text-slate-500 w-12">本卦</span>
-                        <div className="scale-75 md:scale-100 origin-center"><HexagramVisual hexagram={result.originalHexagram} label="" highlight={result.tiGua} movingLine={result.movingLine}/></div>
+                        <div><HexagramVisual hexagram={result.originalHexagram} label="" highlight={result.tiGua} movingLine={result.movingLine}/></div>
                         <span className="hidden md:block mt-2 text-xs text-slate-400 font-mono">Start</span>
                     </div>
                     
@@ -339,7 +338,7 @@ const DailyDivination: React.FC = () => {
                     {/* Mutual */}
                     <div className="flex flex-row md:flex-col items-center gap-4 md:gap-2 w-full md:w-auto justify-between md:justify-center p-3 md:p-0 bg-slate-50 md:bg-transparent rounded-xl md:rounded-none">
                          <span className="md:hidden text-xs font-bold text-slate-500 w-12">互卦</span>
-                         <div className="relative scale-75 md:scale-100 origin-center">
+                         <div className="relative">
                             <HexagramVisual hexagram={result.huHexagram} label=""/>
                             <div className="absolute -top-3 -right-3 w-6 h-6 bg-slate-50 rounded-full flex items-center justify-center border border-white shadow-sm text-slate-300"><GitCommit size={12}/></div>
                          </div>
@@ -353,7 +352,7 @@ const DailyDivination: React.FC = () => {
                     {/* Changed */}
                     <div className="flex flex-row md:flex-col items-center gap-4 md:gap-2 w-full md:w-auto justify-between md:justify-center p-3 md:p-0 bg-slate-50 md:bg-transparent rounded-xl md:rounded-none">
                         <span className="md:hidden text-xs font-bold text-slate-500 w-12">变卦</span>
-                        <div className="scale-75 md:scale-100 origin-center"><HexagramVisual hexagram={result.changedHexagram} label=""/></div>
+                        <div><HexagramVisual hexagram={result.changedHexagram} label=""/></div>
                         <span className="hidden md:block mt-2 text-xs text-slate-400 font-mono">End</span>
                     </div>
                 </div>

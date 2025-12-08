@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { HexagramData, TrigramData } from '../types';
 
@@ -81,9 +80,17 @@ const HexagramVisual: React.FC<Props> = ({ hexagram, label, highlight, movingLin
 
   return (
     <div className="flex flex-col items-center">
-        <span className="text-[10px] font-sans font-bold text-slate-400 mb-3 tracking-[0.2em] uppercase">{label}</span>
+        {label && (
+            <span className="text-[10px] font-sans font-bold text-slate-400 mb-3 tracking-[0.2em] uppercase">{label}</span>
+        )}
         
-        <div className="flex flex-col gap-1 w-44 md:w-52 p-3 rounded-2xl bg-white shadow-[0_2px_15px_-5px_rgba(0,0,0,0.05)] border border-slate-100/50 relative overflow-hidden">
+        {/* 
+            Update:
+            1. Adjusted width to w-40 for mobile (was w-44) to fit better without scaling.
+            2. Added pt-8 (padding-top) to accommodate the absolute positioned sequence badge 
+               so it doesn't overlap with the top lines.
+        */}
+        <div className="flex flex-col gap-1 w-40 md:w-52 pt-8 pb-3 px-3 rounded-2xl bg-white shadow-[0_2px_15px_-5px_rgba(0,0,0,0.05)] border border-slate-100/50 relative overflow-hidden">
              {/* Sequence Badge */}
             <div className="absolute top-2 left-2 bg-slate-50 text-slate-300 text-[9px] px-1.5 py-0.5 rounded border border-slate-100 font-mono z-30">
                 #{hexagram.sequence}
