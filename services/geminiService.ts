@@ -72,6 +72,34 @@ const buildPrompt = (divination: DivinationResult, userQuestion: string): string
 };
 
 /**
+ * 构建每日一卦的提示词 (JSON格式)
+ */
+const buildDailyPrompt = (divination: DivinationResult): string => {
+    const { originalHexagram, changedHexagram, relation, relationScore, movingLineText } = divination;
+    
+    return `
+      你是一位温暖的易学生活导师。用户抽取了“今日一卦”。
+      请根据卦象，为用户提供今日的行动指引。
+  
+      === 卦象信息 ===
+      本卦：${originalHexagram.name} (${originalHexagram.text?.guaci_explain || ''})
+      变卦：${changedHexagram.name}
+      动爻：${movingLineText || '无动爻'}
+      吉凶：${relationScore} (${relation})
+  
+      请**务必**返回且仅返回一个纯 JSON 字符串（不要包含 Markdown 代码块标记 \`\`\`json），格式如下：
+      {
+        "score": 85, // 今日运势评分 (0-100)
+        "keywords": ["关键词1", "关键词2"], // 两个四字以内的核心词
+        "summary": "一句话运势总结（50字以内，温暖且有哲理）。",
+        "fortune": "详细的运势解读（100字左右，结合生活场景，如工作、心态、人际）。",
+        "todo": ["宜做之事1", "宜做之事2"], // 简短
+        "not_todo": ["忌做之事1", "忌做之事2"] // 简短
+      }
+    `;
+};
+
+/**
  * 统一代理调用函数
  * 所有请求都发往 /api/ai-proxy
  */
@@ -185,7 +213,6 @@ export const getInterpretation = async (
     const payload: any = {
         provider,
         prompt,
-        // apiKey: config.apiKey, // REMOVED from Body
         customConfig: config.customConfig
     };
 
@@ -196,4 +223,39 @@ export const getInterpretation = async (
     onStreamUpdate(errMsg);
     return errMsg;
   }
+};
+
+/**
+ * 获取每日指引 (JSON Mode)
+ */
+export const getDailyGuidance = async (
+    divination: DivinationResult,
+    provider: AIProvider,
+    config: { 
+      token?: string; 
+      apiKey?: string; 
+      customConfig?: CustomAIConfig 
+    }
+  ): Promise<any> => {
+    const prompt = buildDailyPrompt(divination);
+    let fullText = "";
+  
+    try {
+      const payload: any = {
+          provider,
+          prompt,
+          customConfig: config.customConfig
+      };
+  
+      await callProxyStream(payload, config.token, config.apiKey, provider, (text) => {
+          fullText = text;
+      });
+      
+      // 尝试清理 Markdown 标记
+      const cleanJson = fullText.replace(/```json\s*|\s*```/g, '').trim();
+      return JSON.parse(cleanJson);
+    } catch (error: any) {
+      console.error("Daily Guidance Parse Error", error, fullText);
+      return null;
+    }
 };
