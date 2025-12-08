@@ -456,7 +456,7 @@ const DailyDivination: React.FC = () => {
             onSuccess={handleLoginSuccess}
         />
 
-        <div className="relative group cursor-pointer" onClick={() => setShowLoginModal(true)}>
+        <div className="relative group cursor-pointer" onClick={handleStartClick}>
             <div className={`absolute inset-0 bg-amber-200 rounded-full blur-2xl transition-opacity duration-500 ${user.isLoggedIn ? 'opacity-30 group-hover:opacity-60' : 'opacity-0'}`}></div>
             
             <button className={`relative w-48 h-48 md:w-56 md:h-56 bg-white rounded-full border-4 shadow-xl flex flex-col items-center justify-center gap-2 transition-all duration-300 ${user.isLoggedIn ? 'border-slate-50 hover:scale-105 active:scale-95 group-hover:border-amber-100' : 'border-slate-100 grayscale hover:grayscale-0'}`}>
