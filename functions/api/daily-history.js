@@ -16,20 +16,25 @@ export async function onRequestGet(context) {
   }
   const username = userPayload.username;
 
+  // 通用响应头 (禁止缓存)
+  const headers = {
+    "Content-Type": "application/json",
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"
+  };
+
   try {
     // 获取历史记录，按日期倒序，限制 30 条
+    // 强制绑定 username
     const records = await env.DB.prepare(
-      "SELECT data FROM daily_readings WHERE username = ? ORDER BY date DESC LIMIT 30"
+      "SELECT data FROM user_daily_readings_v1 WHERE username = ? ORDER BY date DESC LIMIT 30"
     ).bind(username).all();
 
     const parsedData = records.results.map(r => JSON.parse(r.data));
 
-    return new Response(JSON.stringify({ success: true, data: parsedData }), {
-      headers: { "Content-Type": "application/json" }
-    });
+    return new Response(JSON.stringify({ success: true, data: parsedData }), { headers });
 
   } catch (e) {
     console.error("Daily History API Error:", e);
-    return new Response(JSON.stringify({ success: false, message: e.message }), { status: 500 });
+    return new Response(JSON.stringify({ success: false, message: e.message }), { status: 500, headers });
   }
 }

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { calculateDivination } from '../utils/meiHuaLogic';
@@ -5,7 +6,7 @@ import { DivinationResult, AIProvider, UserProfile } from '../types';
 import { getDailyGuidance } from '../services/geminiService';
 import HexagramVisual from './HexagramVisual';
 import AuthModal from './AuthModal';
-import { Sparkles, Sun, CheckCircle, XCircle, Calendar, Star, History, X, ChevronRight, ArrowUp, ArrowDown, MoveHorizontal, GitCommit, ChevronLeft, Lock, User, Loader2, LogIn, ArrowRight } from 'lucide-react';
+import { Sparkles, Sun, CheckCircle, XCircle, Calendar, Star, History, X, ChevronRight, ArrowUp, ArrowDown, MoveHorizontal, GitCommit, ChevronLeft, Lock, User, Loader2, LogIn, ArrowRight, LogOut } from 'lucide-react';
 
 interface DailyData {
   date: string; // YYYY-MM-DD
@@ -30,17 +31,42 @@ const DailyDivination: React.FC = () => {
   const [guestApiKeys, setGuestApiKeys] = useState({ gemini: '', deepseek: '' });
   const [user, setUser] = useState<UserProfile>({ isLoggedIn: false, username: '' });
 
+  // Init User & Listen for Storage Changes (Sync across tabs/components)
   useEffect(() => {
-    // Load User & Config
-    const savedUserStr = localStorage.getItem('user_profile');
-    if (savedUserStr) {
-        const parsedUser = JSON.parse(savedUserStr);
-        setUser(parsedUser);
-        if (parsedUser.isLoggedIn && parsedUser.token) {
-            fetchTodayData(parsedUser.token);
+    const loadUser = () => {
+        const savedUserStr = localStorage.getItem('user_profile');
+        if (savedUserStr) {
+            const parsedUser = JSON.parse(savedUserStr);
+            // Verify if user actually changed to avoid redundant fetches
+            if (parsedUser.username !== user.username || parsedUser.token !== user.token) {
+                setUser(parsedUser);
+                if (parsedUser.isLoggedIn && parsedUser.token) {
+                    fetchTodayData(parsedUser.token);
+                }
+            }
+        } else {
+            // User logged out elsewhere
+            if (user.isLoggedIn) {
+                handleLogout();
+            }
         }
-    }
+    };
+
+    loadUser();
+
+    // Listener for cross-tab or cross-component updates
+    const handleStorageChange = (e: StorageEvent) => {
+        if (e.key === 'user_profile') {
+            loadUser();
+        }
+    };
     
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [user.username, user.token, user.isLoggedIn]);
+
+  // Load Provider Config
+  useEffect(() => {
     const savedProvider = localStorage.getItem('ai_provider') as AIProvider;
     if (savedProvider) setProvider(savedProvider);
   }, []);
@@ -61,6 +87,7 @@ const DailyDivination: React.FC = () => {
         }
       } catch (e) {
           console.error("Failed to fetch today's reading", e);
+          setDailyData(null);
       } finally {
           setIsLoadingToday(false);
       }
@@ -104,6 +131,15 @@ const DailyDivination: React.FC = () => {
       if (newUser.token) {
           fetchTodayData(newUser.token);
       }
+  };
+
+  const handleLogout = () => {
+      setUser({ isLoggedIn: false, username: '' });
+      localStorage.removeItem('user_profile');
+      setDailyData(null);
+      setHistoryList([]);
+      // Dispatch event for other components
+      window.dispatchEvent(new Event("storage"));
   };
 
   const handleStartClick = () => {
@@ -234,6 +270,21 @@ const DailyDivination: React.FC = () => {
                 onClose={() => setShowLoginModal(false)}
                 onSuccess={handleLoginSuccess}
              />
+
+             {/* User Status Bar */}
+             {user.isLoggedIn && (
+                <div className="flex justify-between items-center px-4 py-2 bg-white/60 backdrop-blur rounded-full border border-slate-100 shadow-sm mx-2">
+                    <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 bg-slate-200 rounded-full flex items-center justify-center text-slate-500 text-xs font-bold">
+                            {user.username.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="text-xs text-slate-500 font-medium">当前账号: <span className="text-slate-700">{user.username}</span></span>
+                    </div>
+                    <button onClick={handleLogout} className="text-xs text-slate-400 hover:text-red-500 flex items-center gap-1 transition-colors">
+                        <LogOut size={12}/> 退出
+                    </button>
+                </div>
+             )}
 
              {/* Header Actions */}
              <div className="flex justify-between items-center px-4 md:px-2 pt-2">
