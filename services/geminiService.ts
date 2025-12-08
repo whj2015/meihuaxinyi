@@ -75,24 +75,38 @@ const buildPrompt = (divination: DivinationResult, userQuestion: string): string
  * 构建每日一卦的提示词 (JSON格式)
  */
 const buildDailyPrompt = (divination: DivinationResult): string => {
-    const { originalHexagram, changedHexagram, relation, relationScore, movingLineText } = divination;
+    const { originalHexagram, changedHexagram, huHexagram, relation, relationScore, movingLineText, movingLine } = divination;
     
+    // Construct clearer text data
+    const guaci = originalHexagram.text?.guaci || "";
+    const xiang = originalHexagram.text?.xiang || "";
+    const movingLineInfo = movingLineText ? `动爻(第${movingLine}爻): ${movingLineText}` : "无动爻";
+
     return `
-      你是一位温暖的易学生活导师。用户抽取了“今日一卦”。
-      请根据卦象，为用户提供今日的行动指引。
-  
-      === 卦象信息 ===
-      本卦：${originalHexagram.name} (${originalHexagram.text?.guaci_explain || ''})
-      变卦：${changedHexagram.name}
-      动爻：${movingLineText || '无动爻'}
-      吉凶：${relationScore} (${relation})
-  
+      你是一位温暖且深邃的易学生活导师。用户抽取了“今日一卦”。
+      请务必**综合所有卦象信息**（本卦、互卦、变卦、卦辞、爻辞、五行生克），为用户提供今日的精准行动指引。
+
+      === 完整卦象数据 ===
+      1. **本卦（现状/背景）**：${originalHexagram.name}
+         - 卦辞：${guaci}
+         - 大象：${xiang}
+      2. **动爻（核心变数）**：${movingLineInfo}
+      3. **互卦（内在过程）**：${huHexagram.name}
+      4. **变卦（最终趋势）**：${changedHexagram.name}
+      5. **能量分析**：${relation} (${relationScore})
+
+      === 解读要求 ===
+      1. **深度结合**：不要只看卦名。解读必须呼应“卦辞”的哲理和“动爻”的吉凶指示。
+      2. **全息视角**：结合互卦（过程）和变卦（结果）推导今日的运势走向。
+      3. **生活化**：将易理转化为现代生活的具体建议（心态、工作、人际）。
+      4. **温暖有力**：给用户力量，指出风险但不制造焦虑。
+
       请**务必**返回且仅返回一个纯 JSON 字符串（不要包含 Markdown 代码块标记 \`\`\`json），格式如下：
       {
         "score": 85, // 今日运势评分 (0-100)
         "keywords": ["关键词1", "关键词2"], // 两个四字以内的核心词
-        "summary": "一句话运势总结（50字以内，温暖且有哲理）。",
-        "fortune": "详细的运势解读（100字左右，结合生活场景，如工作、心态、人际）。",
+        "summary": "一句话运势总结（50字以内，要有古韵且通俗）。",
+        "fortune": "详细的运势解读（150字左右）。必须显式地结合卦辞或爻辞的含义来解释今日运势。",
         "todo": ["宜做之事1", "宜做之事2"], // 简短
         "not_todo": ["忌做之事1", "忌做之事2"] // 简短
       }

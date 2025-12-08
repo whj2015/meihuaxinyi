@@ -6,7 +6,7 @@ import { DivinationResult, AIProvider, UserProfile } from '../types';
 import { getDailyGuidance } from '../services/geminiService';
 import HexagramVisual from './HexagramVisual';
 import AuthModal from './AuthModal';
-import { History, X, User, Lock, Quote, ArrowLeft, Loader2, GitCommitHorizontal } from 'lucide-react';
+import { History, X, User, Lock, Quote, ArrowLeft, Loader2, GitCommitHorizontal, ScrollText } from 'lucide-react';
 
 interface DailyData {
   date: string; 
@@ -302,7 +302,7 @@ const DailyDivination: React.FC<DailyDivinationProps> = ({ onBack }) => {
                         </div>
 
                         {/* Full Hexagram Evolution: Original -> Mutual -> Changed */}
-                        <div className="flex justify-between items-end gap-2 mb-4 w-full px-1">
+                        <div className="flex justify-between items-end gap-2 mb-6 w-full px-1">
                             {/* Original Hexagram */}
                             <div className="flex flex-col items-center flex-1">
                                 <span className="text-[10px] text-slate-400 mb-1 tracking-widest uppercase">本卦</span>
@@ -331,6 +331,30 @@ const DailyDivination: React.FC<DailyDivinationProps> = ({ onBack }) => {
                             </div>
                         </div>
 
+                        {/* Hexagram Texts Section - Newly Added */}
+                        <div className="w-full mb-8 space-y-3">
+                            {/* Guaci */}
+                            <div className="bg-amber-50/50 rounded-lg p-3 border border-amber-100/50 text-left relative overflow-hidden">
+                                <div className="absolute top-0 right-0 p-2 opacity-5"><ScrollText size={32}/></div>
+                                <span className="text-[10px] text-amber-900/40 font-bold uppercase tracking-widest block mb-1">卦辞 (The Judgement)</span>
+                                <p className="text-sm font-serif text-slate-800 leading-relaxed font-medium">
+                                    {result.originalHexagram.text?.guaci}
+                                </p>
+                            </div>
+
+                            {/* Moving Line (if exists) */}
+                            {result.movingLineText && (
+                                <div className="bg-slate-50/80 rounded-lg p-3 border border-slate-200/50 text-left">
+                                     <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-1">
+                                         动爻 (Moving Line {result.movingLine})
+                                     </span>
+                                     <p className="text-sm font-serif text-slate-700 leading-relaxed">
+                                         {result.movingLineText}
+                                     </p>
+                                </div>
+                            )}
+                        </div>
+
                         {/* Relationship / Auspiciousness Box */}
                         <div className="bg-slate-50/80 rounded-lg p-3 mb-8 w-full text-center border border-slate-200/50 backdrop-blur-sm">
                              <div className="flex items-center justify-center gap-2 text-xs text-slate-500 mb-1">
@@ -341,7 +365,6 @@ const DailyDivination: React.FC<DailyDivinationProps> = ({ onBack }) => {
                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full text-white ${getRelationColor(result.relationScore)} shadow-sm`}>
                                      {translateRelationScore(result.relationScore)}
                                  </span>
-                                 {result.movingLineText && <span className="text-[10px] text-slate-400 truncate max-w-[120px]">动爻: {result.movingLineText.substring(0, 10)}...</span>}
                              </div>
                         </div>
 
