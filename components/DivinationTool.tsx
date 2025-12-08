@@ -2,12 +2,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { calculateDivination } from '../utils/meiHuaLogic';
-import { DivinationResult, AIProvider, UserProfile, CustomAIConfig, HistoryRecord } from '../types';
+import { DivinationResult, AIProvider, UserProfile, CustomAIConfig, HistoryRecord, TransactionRecord } from '../types';
 import HexagramVisual from './HexagramVisual';
 import { getInterpretation } from '../services/geminiService';
 import AuthModal from './AuthModal';
 import DailyDivination from './DailyDivination';
-import { Sparkles, ArrowLeft, RefreshCcw, Settings, X, Check, User, LogOut, RotateCcw, Loader2, Quote, BookOpen, Activity, History, ChevronRight, Lock, Hash, Calendar, ArrowRight, Wallet } from 'lucide-react';
+import { Sparkles, ArrowLeft, RefreshCcw, Settings, X, Check, User, LogOut, RotateCcw, Loader2, Quote, BookOpen, Activity, History, ChevronRight, Lock, Hash, Calendar, ArrowRight, Wallet, ReceiptText, PlusCircle, MinusCircle } from 'lucide-react';
 
 // --- Markdown Renderer ---
 const FormattedMarkdown: React.FC<{ text: string }> = ({ text }) => {
@@ -94,46 +94,118 @@ const NumberSlot: React.FC<{ value: string; label: string; subLabel: string; onC
 
 // --- Profile / Settings Modal ---
 const ProfileModal: React.FC<{ user: UserProfile; onClose: () => void; onLogout: () => void; onRecharge: () => void }> = ({ user, onClose, onLogout, onRecharge }) => {
+    const [activeTab, setActiveTab] = useState<'overview' | 'history'>('overview');
+    const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
+    const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+
+    useEffect(() => {
+        if (activeTab === 'history') {
+            setIsLoadingLogs(true);
+            fetch('/api/wallet/transactions', {
+                headers: { 'Authorization': `Bearer ${user.token}` }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) setTransactions(data.data);
+            })
+            .finally(() => setIsLoadingLogs(false));
+        }
+    }, [activeTab, user.token]);
+
     return createPortal(
         <div className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-            <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
-                 <div className="absolute top-0 right-0 w-32 h-32 bg-amber-50 rounded-full blur-3xl -z-0 pointer-events-none opacity-50 translate-x-10 -translate-y-10"></div>
+            <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
                  
-                 <div className="flex justify-between items-start mb-6 relative z-10">
-                     <div className="flex items-center gap-3">
-                         <div className="w-12 h-12 bg-slate-900 text-white rounded-full flex items-center justify-center text-xl font-bold font-serif shadow-lg">
-                             {user.username.charAt(0).toUpperCase()}
-                         </div>
-                         <div>
-                             <h3 className="font-bold text-slate-900 text-lg">{user.username}</h3>
-                             <p className="text-xs text-slate-400 uppercase tracking-wider">Member</p>
-                         </div>
-                     </div>
-                     <button onClick={onClose} className="p-2 bg-slate-50 rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600">
-                         <X size={18}/>
-                     </button>
+                 {/* Header */}
+                 <div className="p-6 pb-4 bg-white relative z-10">
+                    <div className="flex justify-between items-start mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-slate-900 text-white rounded-full flex items-center justify-center text-xl font-bold font-serif shadow-lg">
+                                {user.username.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-slate-900 text-lg">{user.username}</h3>
+                                <p className="text-xs text-slate-400 uppercase tracking-wider">Member</p>
+                            </div>
+                        </div>
+                        <button onClick={onClose} className="p-2 bg-slate-50 rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+                            <X size={18}/>
+                        </button>
+                    </div>
+
+                    {/* Tabs */}
+                    <div className="flex border-b border-slate-100">
+                        <button 
+                            onClick={() => setActiveTab('overview')}
+                            className={`flex-1 pb-3 text-sm font-bold transition-colors relative ${activeTab === 'overview' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            <span className="flex items-center justify-center gap-2"><User size={14}/> 账户概览</span>
+                            {activeTab === 'overview' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-900 rounded-t-full"></div>}
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('history')}
+                            className={`flex-1 pb-3 text-sm font-bold transition-colors relative ${activeTab === 'history' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            <span className="flex items-center justify-center gap-2"><ReceiptText size={14}/> 交易记录</span>
+                            {activeTab === 'history' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-900 rounded-t-full"></div>}
+                        </button>
+                    </div>
                  </div>
-                 
-                 <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 mb-6 relative z-10">
-                     <div className="flex justify-between items-center mb-1">
-                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Credits</span>
-                         <span className="text-amber-600 font-bold flex items-center gap-1 text-sm"><Sparkles size={12}/> 灵力点数</span>
-                     </div>
-                     <div className="flex items-end gap-2">
-                         <span className="text-3xl font-bold text-slate-900 font-serif">{user.credits || 0}</span>
-                         <span className="text-xs text-slate-400 mb-1.5">pts</span>
-                     </div>
-                     <button 
-                        onClick={onRecharge}
-                        className="mt-3 w-full py-2 bg-white border border-amber-200 text-amber-700 rounded-lg text-xs font-bold shadow-sm hover:shadow-md hover:bg-amber-50 transition-all flex items-center justify-center gap-2"
-                     >
-                         <Wallet size={14}/> 充值点数 (模拟)
-                     </button>
+
+                 {/* Content Area */}
+                 <div className="p-6 pt-2 overflow-y-auto flex-1">
+                     {activeTab === 'overview' ? (
+                         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                             <div className="absolute top-0 right-0 w-32 h-32 bg-amber-50 rounded-full blur-3xl -z-0 pointer-events-none opacity-50 translate-x-10 -translate-y-10"></div>
+                             
+                             <div className="bg-slate-50 rounded-xl p-5 border border-slate-100 relative z-10">
+                                 <div className="flex justify-between items-center mb-1">
+                                     <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Available Credits</span>
+                                     <span className="text-amber-600 font-bold flex items-center gap-1 text-sm"><Sparkles size={12}/> 灵力点数</span>
+                                 </div>
+                                 <div className="flex items-end gap-2">
+                                     <span className="text-4xl font-bold text-slate-900 font-serif">{user.credits || 0}</span>
+                                     <span className="text-xs text-slate-400 mb-1.5">pts</span>
+                                 </div>
+                                 <button 
+                                    onClick={onRecharge}
+                                    className="mt-4 w-full py-2.5 bg-white border border-amber-200 text-amber-700 rounded-lg text-sm font-bold shadow-sm hover:shadow-md hover:bg-amber-50 transition-all flex items-center justify-center gap-2"
+                                 >
+                                     <Wallet size={16}/> 充值点数 (模拟)
+                                 </button>
+                             </div>
+                             
+                             <button onClick={onLogout} className="w-full py-3 rounded-xl border border-slate-200 text-slate-500 text-sm font-bold hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-all flex items-center justify-center gap-2">
+                                 <LogOut size={16}/> 退出登录
+                             </button>
+                         </div>
+                     ) : (
+                         <div className="space-y-3 animate-in fade-in slide-in-from-right-4 duration-300 min-h-[200px]">
+                             {isLoadingLogs ? (
+                                 <div className="flex justify-center py-8"><Loader2 className="animate-spin text-slate-300"/></div>
+                             ) : transactions.length === 0 ? (
+                                 <div className="text-center py-8 text-slate-400 text-xs">暂无交易记录</div>
+                             ) : (
+                                 transactions.map((tx) => (
+                                     <div key={tx.id} className="flex justify-between items-center p-3 rounded-lg border border-slate-50 bg-slate-50/50">
+                                         <div className="flex items-center gap-3">
+                                             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${tx.type === 'usage' ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-500'}`}>
+                                                 {tx.type === 'usage' ? <MinusCircle size={14}/> : <PlusCircle size={14}/>}
+                                             </div>
+                                             <div>
+                                                 <div className="text-sm font-bold text-slate-700">{tx.description}</div>
+                                                 <div className="text-[10px] text-slate-400">{new Date(tx.timestamp).toLocaleString()}</div>
+                                             </div>
+                                         </div>
+                                         <div className={`font-mono font-bold ${tx.amount > 0 ? 'text-green-600' : 'text-slate-800'}`}>
+                                             {tx.amount > 0 ? '+' : ''}{tx.amount}
+                                         </div>
+                                     </div>
+                                 ))
+                             )}
+                         </div>
+                     )}
                  </div>
-                 
-                 <button onClick={onLogout} className="w-full py-3 rounded-xl border border-slate-200 text-slate-500 text-sm font-bold hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-all flex items-center justify-center gap-2">
-                     <LogOut size={16}/> 退出登录
-                 </button>
             </div>
         </div>,
         document.body
@@ -198,13 +270,29 @@ const DivinationTool: React.FC = () => {
   };
   
   const handleRecharge = async () => {
-      // Mock recharge
-      const newCredits = (user.credits || 0) + 10;
-      // In real app, call API. For now, update local state
-      const updatedUser = { ...user, credits: newCredits };
-      setUser(updatedUser);
-      localStorage.setItem('user_profile', JSON.stringify(updatedUser));
-      alert("充值成功！(模拟)");
+      if (!user.token) return;
+      try {
+          const res = await fetch('/api/wallet/recharge', {
+              method: 'POST',
+              headers: { 
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${user.token}`
+              },
+              body: JSON.stringify({ amount: 10 })
+          });
+          const data = await res.json();
+          if (data.success) {
+              const updatedUser = { ...user, credits: data.credits };
+              setUser(updatedUser);
+              localStorage.setItem('user_profile', JSON.stringify(updatedUser));
+              alert("充值成功！点数 +10");
+          } else {
+              alert("充值失败: " + data.message);
+          }
+      } catch (e) {
+          console.error(e);
+          alert("网络错误");
+      }
   };
 
   const handleCalculate = async () => {
@@ -250,7 +338,18 @@ const DivinationTool: React.FC = () => {
         provider,
         { token: user.token, apiKey: currentKey, customConfig },
         (text) => setAiInterpretation(text)
-    ).finally(() => setLoadingAI(false));
+    ).finally(() => {
+        setLoadingAI(false);
+        // 如果是 DeepSeek 或 Gemini 系统扣费，需要更新前端显示的 Credits
+        // 简单起见，重新获取一次用户信息或者手动减1 (这里手动减1以即时反馈，实际应以服务器为准)
+        // 最好是加一个 checkBalance 的函数，这里简化处理
+        if (!guestApiKeys.gemini && !guestApiKeys.deepseek && user.credits && user.credits > 0) {
+            const newCredits = user.credits - 1;
+            const updatedUser = { ...user, credits: newCredits };
+            setUser(updatedUser);
+            localStorage.setItem('user_profile', JSON.stringify(updatedUser));
+        }
+    });
   };
 
   const handleRandom = () => {

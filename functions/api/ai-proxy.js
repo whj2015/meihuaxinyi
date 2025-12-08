@@ -4,9 +4,22 @@ import { verifyJwt, decryptData } from '../lib/security';
 export async function onRequestPost(context) {
   const { request, env } = context;
 
+  // 确保日志表存在 (安全起见)
+  try {
+    await env.DB.prepare(`
+      CREATE TABLE IF NOT EXISTS credit_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL,
+        type TEXT NOT NULL, 
+        amount INTEGER NOT NULL,
+        description TEXT,
+        timestamp INTEGER
+      )
+    `).run();
+  } catch (e) {}
+
   try {
     const { 
-      // apiKey, // REMOVED: Guest Key no longer in body
       provider,       
       prompt,
       customConfig 
@@ -72,6 +85,8 @@ export async function onRequestPost(context) {
                 
                 if (deductRes.meta.changes > 0) {
                     creditsDeducted = true; // 标记已扣费
+                    // 记录消费日志
+                    await env.DB.prepare("INSERT INTO credit_logs (username, type, amount, description, timestamp) VALUES (?, 'usage', -1, 'AI解卦消耗', ?)").bind(currentUser.username, Date.now()).run();
                     
                     const sysDeepseek = env.DEFAULT_DEEPSEEK_KEY;
                     const sysGemini = env.DEFAULT_GEMINI_KEY;
@@ -100,6 +115,8 @@ export async function onRequestPost(context) {
       // 如果已扣费但没找到Key，退款
       if (creditsDeducted) {
           await env.DB.prepare("UPDATE users SET credits = credits + 1 WHERE username = ?").bind(currentUser.username).run();
+          // 记录退款日志
+          await env.DB.prepare("INSERT INTO credit_logs (username, type, amount, description, timestamp) VALUES (?, 'refund', 1, 'Key不可用退款', ?)").bind(currentUser.username, Date.now()).run();
       }
       return new Response(JSON.stringify({ error: "未配置 API Key 且系统默认服务暂不可用" }), { status: 400 });
     }
@@ -154,6 +171,8 @@ export async function onRequestPost(context) {
         // 请求失败，执行退款
         if (creditsDeducted) {
             await env.DB.prepare("UPDATE users SET credits = credits + 1 WHERE username = ?").bind(currentUser.username).run();
+            // 记录退款日志
+            await env.DB.prepare("INSERT INTO credit_logs (username, type, amount, description, timestamp) VALUES (?, 'refund', 1, 'API错误退款', ?)").bind(currentUser.username, Date.now()).run();
         }
         const errText = await upstreamResponse.text();
         return new Response(JSON.stringify({ error: `AI 服务错误: ${upstreamResponse.status}`, details: errText }), { status: upstreamResponse.status });
@@ -171,8 +190,6 @@ export async function onRequestPost(context) {
 
   } catch (err) {
     console.error(err);
-    // 捕获异常，尝试退款（如果是扣费用户）
-    // 注意：如果是流式传输中断，可能无法在此处捕获
     return new Response(JSON.stringify({ error: "Proxy Error: " + err.message }), { status: 500 });
   }
 }

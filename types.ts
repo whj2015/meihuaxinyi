@@ -89,3 +89,12 @@ export interface HistoryRecord {
   ai_response?: string;
   timestamp: number;
 }
+
+export interface TransactionRecord {
+  id: number;
+  username: string;
+  type: 'recharge' | 'usage' | 'refund';
+  amount: number;
+  description: string;
+  timestamp: number;
+}
