@@ -1,12 +1,13 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { calculateDivination } from '../utils/meiHuaLogic';
 import { DivinationResult, AIProvider, UserProfile } from '../types';
 import { getDailyGuidance } from '../services/geminiService';
 import HexagramVisual from './HexagramVisual';
 import AuthModal from './AuthModal';
-import { History, X, User, Lock, Quote, ArrowLeft, Loader2, GitCommitHorizontal, ScrollText } from 'lucide-react';
+import { History, X, User, Lock, Quote, ArrowLeft, Loader2, GitCommitHorizontal, ScrollText, Share2, Download } from 'lucide-react';
+import html2canvas from 'html2canvas';
 
 interface DailyData {
   date: string; 
@@ -58,10 +59,13 @@ const DailyDivination: React.FC<DailyDivinationProps> = ({ onBack }) => {
   const [isAnimating, setIsAnimating] = useState(false);
   const [isCheckingToday, setIsCheckingToday] = useState(true); // Default true to prevent flash
   const [loadingState, setLoadingState] = useState<'idle' | 'shuffling' | 'calculating' | 'interpreting'>('idle');
+  const [isSharing, setIsSharing] = useState(false);
 
   const [provider, setProvider] = useState<AIProvider>('deepseek');
   const [guestApiKeys, setGuestApiKeys] = useState({ gemini: '', deepseek: '' });
   const [user, setUser] = useState<UserProfile>({ isLoggedIn: false, username: '' });
+
+  const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const loadUser = () => {
@@ -192,6 +196,29 @@ const DailyDivination: React.FC<DailyDivinationProps> = ({ onBack }) => {
     }, 3500); 
   };
 
+  const handleShare = async () => {
+    if (!cardRef.current || isSharing) return;
+    setIsSharing(true);
+    try {
+        const canvas = await html2canvas(cardRef.current, {
+            scale: 2, // Retina support
+            backgroundColor: '#fffcf5', // Match card bg
+            logging: false,
+            useCORS: true
+        });
+        const image = canvas.toDataURL("image/png");
+        const link = document.createElement('a');
+        link.href = image;
+        link.download = `Daily_Fortune_${dailyData?.date}.png`;
+        link.click();
+    } catch (err) {
+        console.error("Share failed", err);
+        alert("图片生成失败，请重试");
+    } finally {
+        setIsSharing(false);
+    }
+  };
+
   const formatDate = (dateStr: string) => {
       const date = new Date(dateStr);
       return date.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
@@ -264,13 +291,24 @@ const DailyDivination: React.FC<DailyDivinationProps> = ({ onBack }) => {
                          </span>
                      )}
                  </div>
-                 <button onClick={() => {setShowHistory(true); fetchHistoryData();}} className="p-2 bg-white rounded-full shadow-sm border border-slate-100 text-slate-500 hover:text-slate-800 active:scale-95 transition-all">
-                    <History size={18} />
-                 </button>
+                 
+                 <div className="flex gap-2">
+                    <button 
+                        onClick={handleShare}
+                        disabled={isSharing} 
+                        className="p-2 bg-white rounded-full shadow-sm border border-slate-100 text-slate-500 hover:text-amber-600 active:scale-95 transition-all flex items-center justify-center"
+                        title="保存为图片"
+                    >
+                         {isSharing ? <Loader2 size={18} className="animate-spin text-amber-500"/> : <Share2 size={18} />}
+                    </button>
+                    <button onClick={() => {setShowHistory(true); fetchHistoryData();}} className="p-2 bg-white rounded-full shadow-sm border border-slate-100 text-slate-500 hover:text-slate-800 active:scale-95 transition-all">
+                        <History size={18} />
+                    </button>
+                 </div>
              </div>
 
              {/* The Card */}
-             <div className="bg-[#fffcf5] rounded-none md:rounded-xl shadow-2xl overflow-hidden relative font-serif text-slate-800 ring-1 ring-slate-900/5 mx-auto max-w-[400px]">
+             <div ref={cardRef} className="bg-[#fffcf5] rounded-none md:rounded-xl shadow-2xl overflow-hidden relative font-serif text-slate-800 ring-1 ring-slate-900/5 mx-auto max-w-[400px]">
                 {/* Decoration: Red Header Line */}
                 <div className="h-2 bg-[#c62828] w-full"></div>
                 
@@ -309,7 +347,9 @@ const DailyDivination: React.FC<DailyDivinationProps> = ({ onBack }) => {
                                 <div className="scale-75 origin-bottom transform transition-transform hover:scale-90">
                                     <HexagramVisual hexagram={result.originalHexagram} highlight={result.tiGua} />
                                 </div>
-                                <span className="text-xs font-bold mt-2 text-slate-800">{result.originalHexagram.name}</span>
+                                <span className="text-xs font-bold mt-2 text-slate-800 flex items-center gap-1">
+                                    {result.originalHexagram.name} <span className="text-slate-400 font-mono font-normal">#{result.originalHexagram.sequence}</span>
+                                </span>
                             </div>
 
                             {/* Arrow / Mutual */}
@@ -318,7 +358,10 @@ const DailyDivination: React.FC<DailyDivinationProps> = ({ onBack }) => {
                                 <div className="scale-[0.4] origin-center">
                                     <HexagramVisual hexagram={result.huHexagram} />
                                 </div>
-                                <GitCommitHorizontal size={14} className="text-slate-300 mt-1"/>
+                                <div className="flex items-center gap-1 mt-1">
+                                    <GitCommitHorizontal size={14} className="text-slate-300"/>
+                                    <span className="text-[9px] text-slate-400 font-mono">#{result.huHexagram.sequence}</span>
+                                </div>
                             </div>
 
                             {/* Changed Hexagram */}
@@ -327,7 +370,9 @@ const DailyDivination: React.FC<DailyDivinationProps> = ({ onBack }) => {
                                 <div className="scale-75 origin-bottom transform transition-transform hover:scale-90">
                                     <HexagramVisual hexagram={result.changedHexagram} />
                                 </div>
-                                <span className="text-xs font-bold mt-2 text-slate-800">{result.changedHexagram.name}</span>
+                                <span className="text-xs font-bold mt-2 text-slate-800 flex items-center gap-1">
+                                    {result.changedHexagram.name} <span className="text-slate-400 font-mono font-normal">#{result.changedHexagram.sequence}</span>
+                                </span>
                             </div>
                         </div>
 
@@ -452,7 +497,7 @@ const DailyDivination: React.FC<DailyDivinationProps> = ({ onBack }) => {
                     <ArrowLeft size={20} />
                 </button>
                 <div className="w-full text-center pointer-events-none">
-                    <h2 className="font-serif font-bold text-xl text-slate-900">晨起占运</h2>
+                    <h2 className="font-serif font-bold text-xl text-slate-900">每日占运</h2>
                 </div>
             </div>
         )}
@@ -464,7 +509,7 @@ const DailyDivination: React.FC<DailyDivinationProps> = ({ onBack }) => {
         <div className="mt-12 text-center space-y-4 max-w-xs">
             {user.isLoggedIn ? (
                 <>
-                    <h2 className="font-serif text-2xl font-bold text-slate-900">今日一卦</h2>
+                    <h2 className="font-serif text-2xl font-bold text-slate-900">每日一卦</h2>
                     <p className="font-serif text-sm text-slate-500 leading-relaxed">
                         心动即占，无事不占。<br/>请保持内心平静，点击上方太极开启。
                     </p>

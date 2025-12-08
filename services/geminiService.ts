@@ -103,7 +103,7 @@ const buildDailyPrompt = (divination: DivinationResult): string => {
 
       请**务必**返回且仅返回一个纯 JSON 字符串（不要包含 Markdown 代码块标记 \`\`\`json），格式如下：
       {
-        "score": 85, // 今日运势评分 (0-100)
+        "score": *, // 今日运势评分 (0-100) *表示根据解析给出的分数
         "keywords": ["关键词1", "关键词2"], // 两个四字以内的核心词
         "summary": "一句话运势总结（50字以内，要有古韵且通俗）。",
         "fortune": "详细的运势解读（150字左右）。必须显式地结合卦辞或爻辞的含义来解释今日运势。",
