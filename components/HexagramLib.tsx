@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { HEXAGRAM_SEQUENCE, HEXAGRAM_NAMES, TRIGRAMS } from '../constants';
 import { getIChingText } from '../utils/ichingData';
@@ -60,27 +59,27 @@ const HexagramLib: React.FC = () => {
         <div className="relative max-w-md mx-auto">
           <input 
             type="text" 
-            placeholder="搜索..." 
+            placeholder="搜索卦名 (如: 乾, 屯)..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-full shadow-sm focus:ring-2 focus:ring-amber-100 focus:border-amber-400 outline-none transition-all text-sm"
+            className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-full shadow-sm focus:ring-2 focus:ring-amber-100 focus:border-amber-400 outline-none transition-all text-sm"
           />
-          <Search className="absolute left-3 top-3 text-slate-400" size={16} />
+          <Search className="absolute left-3.5 top-3.5 text-slate-400" size={16} />
         </div>
       </div>
 
       {/* Grid: 3 cols mobile, 6 cols tablet, 8 cols desktop */}
-      <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-8 gap-2 md:gap-4 px-1">
+      <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-8 gap-3 md:gap-4 px-1">
         {filteredList.map((hex) => (
           <button 
             key={hex.sequence}
             onClick={() => setSelectedHex(hex)}
-            className="flex flex-col items-center justify-between py-2 px-1 bg-white border border-slate-100 rounded-xl active:scale-95 hover:shadow-md transition-all group aspect-[3/4]"
+            className="flex flex-col items-center justify-center py-3 px-2 bg-white border border-slate-100 rounded-xl active:scale-95 hover:shadow-md transition-all group aspect-[3/4] shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)]"
           >
-            <span className="text-[9px] text-slate-300 font-mono self-start ml-1">#{hex.sequence}</span>
+            <span className="text-[9px] text-slate-300 font-mono mb-1">#{hex.sequence}</span>
             <MiniHexagram upper={hex.upper} lower={hex.lower} />
-            <div className="text-center mt-1">
-                <div className="font-serif font-bold text-slate-700 text-xs leading-tight">{hex.name}</div>
+            <div className="text-center mt-2">
+                <div className="font-serif font-bold text-slate-700 text-sm leading-tight">{hex.name}</div>
             </div>
           </button>
         ))}
@@ -133,7 +132,7 @@ const HexagramLib: React.FC = () => {
                              <h4 className="text-xs font-bold text-slate-400 uppercase mb-3 text-center">六爻</h4>
                              <div className="space-y-2">
                                 {[6, 5, 4, 3, 2, 1].map((lineNum) => (
-                                    <div key={lineNum} className="p-3 bg-white rounded-xl border border-slate-50 flex gap-3">
+                                    <div key={lineNum} className="p-3 bg-white rounded-xl border border-slate-50 flex gap-3 shadow-sm">
                                         <div className="shrink-0 w-6 h-6 rounded-full bg-slate-100 text-slate-500 font-serif font-bold flex items-center justify-center text-xs">{lineNum}</div>
                                         <div className="flex-1 space-y-1">
                                             <p className="font-serif text-slate-700 text-sm font-medium">{selectedHex.text?.lines[lineNum]}</p>
