@@ -6,7 +6,7 @@ import { DivinationResult, AIProvider, UserProfile } from '../types';
 import { getDailyGuidance } from '../services/geminiService';
 import HexagramVisual from './HexagramVisual';
 import AuthModal from './AuthModal';
-import { History, X, User, Lock, Quote, ArrowLeft, Loader2 } from 'lucide-react';
+import { History, X, User, Lock, Quote, ArrowLeft, Loader2, GitCommitHorizontal } from 'lucide-react';
 
 interface DailyData {
   date: string; 
@@ -201,6 +201,24 @@ const DailyDivination: React.FC<DailyDivinationProps> = ({ onBack }) => {
       return new Date(dateStr).toLocaleDateString('zh-CN', { weekday: 'long' });
   };
 
+  // Helper to translate score
+  const translateRelationScore = (score: string) => {
+      const map: Record<string, string> = {
+          'Great Auspicious': '大吉',
+          'Minor Auspicious': '小吉',
+          'Auspicious': '吉',
+          'Minor Bad': '小凶',
+          'Great Bad': '大凶'
+      };
+      return map[score] || score;
+  };
+  
+  const getRelationColor = (score: string) => {
+      if (score.includes('Bad')) return 'bg-slate-700';
+      if (score.includes('Minor Auspicious')) return 'bg-amber-600';
+      return 'bg-red-600';
+  };
+
   // --- View: Loading Animation ---
   if (isAnimating) {
     return (
@@ -276,16 +294,55 @@ const DailyDivination: React.FC<DailyDivinationProps> = ({ onBack }) => {
 
                     {/* Main Content */}
                     <div className="relative z-10 w-full">
-                        <div className="mb-8">
-                             <Quote size={24} className="text-amber-500/30 mx-auto mb-4 rotate-180"/>
-                             <h2 className="text-2xl font-bold leading-relaxed text-slate-800">
+                        <div className="mb-6">
+                             <Quote size={24} className="text-amber-500/30 mx-auto mb-2 rotate-180"/>
+                             <h2 className="text-xl font-bold leading-relaxed text-slate-800">
                                 {guidance.summary}
                              </h2>
                         </div>
 
-                        {/* Hexagram Visual Minimal */}
-                        <div className="flex justify-center mb-8 opacity-80 grayscale hover:grayscale-0 transition-all duration-500">
-                            <HexagramVisual hexagram={result.changedHexagram} />
+                        {/* Full Hexagram Evolution: Original -> Mutual -> Changed */}
+                        <div className="flex justify-between items-end gap-2 mb-4 w-full px-1">
+                            {/* Original Hexagram */}
+                            <div className="flex flex-col items-center flex-1">
+                                <span className="text-[10px] text-slate-400 mb-1 tracking-widest uppercase">本卦</span>
+                                <div className="scale-75 origin-bottom transform transition-transform hover:scale-90">
+                                    <HexagramVisual hexagram={result.originalHexagram} highlight={result.tiGua} />
+                                </div>
+                                <span className="text-xs font-bold mt-2 text-slate-800">{result.originalHexagram.name}</span>
+                            </div>
+
+                            {/* Arrow / Mutual */}
+                            <div className="flex flex-col items-center justify-center opacity-60 pb-6">
+                                <span className="text-[9px] text-slate-400 mb-1">互</span>
+                                <div className="scale-[0.4] origin-center">
+                                    <HexagramVisual hexagram={result.huHexagram} />
+                                </div>
+                                <GitCommitHorizontal size={14} className="text-slate-300 mt-1"/>
+                            </div>
+
+                            {/* Changed Hexagram */}
+                            <div className="flex flex-col items-center flex-1">
+                                <span className="text-[10px] text-slate-400 mb-1 tracking-widest uppercase">变卦</span>
+                                <div className="scale-75 origin-bottom transform transition-transform hover:scale-90">
+                                    <HexagramVisual hexagram={result.changedHexagram} />
+                                </div>
+                                <span className="text-xs font-bold mt-2 text-slate-800">{result.changedHexagram.name}</span>
+                            </div>
+                        </div>
+
+                        {/* Relationship / Auspiciousness Box */}
+                        <div className="bg-slate-50/80 rounded-lg p-3 mb-8 w-full text-center border border-slate-200/50 backdrop-blur-sm">
+                             <div className="flex items-center justify-center gap-2 text-xs text-slate-500 mb-1">
+                                 <span className="font-bold">体用生克:</span> 
+                                 <span>{result.relation}</span>
+                             </div>
+                             <div className="flex items-center justify-center gap-2">
+                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full text-white ${getRelationColor(result.relationScore)} shadow-sm`}>
+                                     {translateRelationScore(result.relationScore)}
+                                 </span>
+                                 {result.movingLineText && <span className="text-[10px] text-slate-400 truncate max-w-[120px]">动爻: {result.movingLineText.substring(0, 10)}...</span>}
+                             </div>
                         </div>
 
                         {/* Guidance Text */}
