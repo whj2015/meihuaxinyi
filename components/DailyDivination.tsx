@@ -15,8 +15,6 @@ interface DailyData {
   guidance: any; // JSON object from AI
 }
 
-const HISTORY_KEY = 'daily_divination_history_v1';
-
 const DailyDivination: React.FC = () => {
   const [dailyData, setDailyData] = useState<DailyData | null>(null);
   const [historyList, setHistoryList] = useState<DailyData[]>([]);
@@ -25,6 +23,7 @@ const DailyDivination: React.FC = () => {
   
   const [isAnimating, setIsAnimating] = useState(false);
   const [loadingAI, setLoadingAI] = useState(false);
+  const [isLoadingToday, setIsLoadingToday] = useState(false); // New: Loading state for initial check
   const [animationStep, setAnimationStep] = useState(0); // 0: Idle, 1: Breathing, 2: Revealing
 
   // Config & User
@@ -35,47 +34,77 @@ const DailyDivination: React.FC = () => {
   useEffect(() => {
     // Load User & Config
     const savedUserStr = localStorage.getItem('user_profile');
-    if (savedUserStr) setUser(JSON.parse(savedUserStr));
+    if (savedUserStr) {
+        const parsedUser = JSON.parse(savedUserStr);
+        setUser(parsedUser);
+        if (parsedUser.isLoggedIn && parsedUser.token) {
+            fetchTodayData(parsedUser.token);
+        }
+    }
     
     const savedProvider = localStorage.getItem('ai_provider') as AIProvider;
     if (savedProvider) setProvider(savedProvider);
-    
-    // Load History
-    const savedHistory = localStorage.getItem(HISTORY_KEY);
-    if (savedHistory) {
-        try {
-            setHistoryList(JSON.parse(savedHistory));
-        } catch(e) {
-            console.error("Failed to parse history");
-        }
-    }
-
-    // Check for today's data
-    const today = new Date().toISOString().split('T')[0];
-    const savedDaily = localStorage.getItem(`daily_reading_${today}`);
-    
-    if (savedDaily) {
-      try {
-        setDailyData(JSON.parse(savedDaily));
-      } catch (e) {
-        localStorage.removeItem(`daily_reading_${today}`);
-      }
-    }
   }, []);
 
-  const saveToHistory = (data: DailyData) => {
-      // Get current history
-      const currentList = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
-      // Remove any existing entry for this date to avoid duplicates/updates
-      const filtered = currentList.filter((item: DailyData) => item.date !== data.date);
-      // Add new to top
-      const newList = [data, ...filtered];
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(newList));
-      setHistoryList(newList);
+  // Fetch today's data from server
+  const fetchTodayData = async (token: string) => {
+      setIsLoadingToday(true);
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const res = await fetch(`/api/daily-reading?date=${today}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const json = await res.json();
+        if (json.success && json.data) {
+            setDailyData(json.data);
+        } else {
+            setDailyData(null);
+        }
+      } catch (e) {
+          console.error("Failed to fetch today's reading", e);
+      } finally {
+          setIsLoadingToday(false);
+      }
+  };
+
+  const fetchHistoryData = async () => {
+      if (!user.token) return;
+      try {
+          const res = await fetch('/api/daily-history', {
+              headers: { 'Authorization': `Bearer ${user.token}` }
+          });
+          const json = await res.json();
+          if (json.success) {
+              setHistoryList(json.data);
+          }
+      } catch (e) {
+          console.error("Failed to fetch history", e);
+      }
+  };
+
+  const saveToServer = async (data: DailyData) => {
+      if (!user.token) return;
+      try {
+          await fetch('/api/daily-reading', {
+              method: 'POST',
+              headers: { 
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${user.token}`
+              },
+              body: JSON.stringify(data)
+          });
+          // Refresh history silently
+          fetchHistoryData();
+      } catch (e) {
+          console.error("Failed to save reading", e);
+      }
   };
 
   const handleLoginSuccess = (newUser: UserProfile) => {
       setUser(newUser);
+      if (newUser.token) {
+          fetchTodayData(newUser.token);
+      }
   };
 
   const handleStartClick = () => {
@@ -127,13 +156,17 @@ const DailyDivination: React.FC = () => {
             }
         };
 
-        localStorage.setItem(`daily_reading_${today}`, JSON.stringify(newData));
-        saveToHistory(newData); // Save to history list
+        await saveToServer(newData); // Save to DB
         setDailyData(newData);
         setIsAnimating(false);
         setLoadingAI(false);
         setAnimationStep(0);
     }, 4500); // Total animation duration
+  };
+
+  const handleShowHistory = () => {
+      setShowHistory(true);
+      fetchHistoryData();
   };
 
   const getRelationVisual = (score: string) => {
@@ -151,6 +184,16 @@ const DailyDivination: React.FC = () => {
       const date = new Date(dateStr);
       return date.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' });
   };
+
+  // --- Render: Loading Phase ---
+  if (isLoadingToday) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[60vh] animate-in fade-in">
+             <Loader2 size={32} className="animate-spin text-slate-300 mb-4"/>
+             <p className="text-slate-400 text-xs font-serif tracking-widest">正在连接云端...</p>
+        </div>
+      );
+  }
 
   // --- Render: Animation Phase ---
   if (isAnimating) {
@@ -204,7 +247,7 @@ const DailyDivination: React.FC = () => {
                         <History size={12}/> 历史回溯：{date}
                      </span>
                  )}
-                 <button onClick={() => setShowHistory(true)} className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 transition-all shadow-sm">
+                 <button onClick={handleShowHistory} className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 transition-all shadow-sm">
                     <History size={16} /> <span className="text-xs font-bold">历史记录</span>
                  </button>
              </div>
@@ -364,7 +407,7 @@ const DailyDivination: React.FC = () => {
                             {historyList.length === 0 ? (
                                 <div className="text-center py-20 text-slate-400 text-sm">
                                     <Calendar size={32} className="mx-auto mb-3 opacity-30"/>
-                                    <p>暂无历史记录</p>
+                                    <p>暂无云端记录</p>
                                     <p className="text-xs text-slate-300 mt-1">坚持每日一占，积累运势轨迹</p>
                                 </div>
                             ) : (
@@ -455,11 +498,9 @@ const DailyDivination: React.FC = () => {
                     <div className="inline-flex items-center gap-2 text-xs text-amber-600 bg-amber-50 px-3 py-1 rounded-full border border-amber-100">
                         <Calendar size={12}/> 每日限占一次
                     </div>
-                    {historyList.length > 0 && (
-                        <button onClick={() => setShowHistory(true)} className="inline-flex items-center gap-2 text-xs text-slate-500 hover:text-slate-800 bg-white hover:bg-slate-50 px-3 py-1 rounded-full border border-slate-200 transition-colors">
-                            <History size={12}/> 往期 ({historyList.length})
-                        </button>
-                    )}
+                    <button onClick={handleShowHistory} className="inline-flex items-center gap-2 text-xs text-slate-500 hover:text-slate-800 bg-white hover:bg-slate-50 px-3 py-1 rounded-full border border-slate-200 transition-colors">
+                        <History size={12}/> 往期回顾
+                    </button>
                 </div>
             ) : (
                 <div className="flex flex-col items-center gap-2">
@@ -473,58 +514,58 @@ const DailyDivination: React.FC = () => {
 
         {/* Reuse History for Initial Screen */}
         {showHistory && createPortal(
-                <>
-                    <div 
-                        className="fixed inset-0 z-[140] bg-slate-900/30 backdrop-blur-sm animate-in fade-in duration-300"
-                        onClick={() => setShowHistory(false)}
-                    />
-                    <div className="fixed inset-y-0 right-0 z-[150] w-full md:w-80 bg-white shadow-2xl border-l border-slate-100 flex flex-col h-[100dvh] animate-in slide-in-from-right duration-300">
-                        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white/80 backdrop-blur-md sticky top-0 z-10 shrink-0">
-                            <h3 className="font-serif font-bold text-slate-800 flex items-center gap-2">
-                                <History size={18}/> 每日一卦记录
-                            </h3>
-                            <button onClick={() => setShowHistory(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-                                <X size={18} className="text-slate-400"/>
-                            </button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar overscroll-contain">
-                            {historyList.length === 0 ? (
-                                <div className="text-center py-20 text-slate-400 text-sm">
-                                    <Calendar size={32} className="mx-auto mb-3 opacity-30"/>
-                                    <p>暂无历史记录</p>
-                                </div>
-                            ) : (
-                                historyList.map((record, idx) => (
-                                    <div 
-                                        key={idx} 
-                                        onClick={() => { setDailyData(record); setShowHistory(false); }}
-                                        className={`bg-white border rounded-xl p-4 cursor-pointer transition-all hover:shadow-md group border-slate-100 hover:border-amber-200`}
-                                    >
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div className="font-serif font-bold text-slate-800">{formatDate(record.date)}</div>
-                                            <div className={`text-xs font-bold px-1.5 py-0.5 rounded ${record.guidance.score >= 80 ? 'text-red-600 bg-red-50' : (record.guidance.score >= 60 ? 'text-amber-600 bg-amber-50' : 'text-slate-500 bg-slate-50')}`}>
-                                                {record.guidance.score}分
-                                            </div>
-                                        </div>
-                                        <div className="text-xs text-slate-500 line-clamp-2 leading-relaxed mb-2">
-                                            {record.guidance.summary}
-                                        </div>
-                                        <div className="flex items-center justify-between pt-2 border-t border-slate-50">
-                                            <div className="flex gap-1">
-                                                {record.guidance.keywords?.slice(0, 2).map((k:string, i:number) => (
-                                                    <span key={i} className="text-[9px] text-slate-400 bg-slate-50 px-1 rounded">#{k}</span>
-                                                ))}
-                                            </div>
-                                            <ChevronLeft size={14} className="text-slate-300 group-hover:text-amber-400 transition-colors rotate-180"/>
+            <>
+                <div 
+                    className="fixed inset-0 z-[140] bg-slate-900/30 backdrop-blur-sm animate-in fade-in duration-300"
+                    onClick={() => setShowHistory(false)}
+                />
+                <div className="fixed inset-y-0 right-0 z-[150] w-full md:w-80 bg-white shadow-2xl border-l border-slate-100 flex flex-col h-[100dvh] animate-in slide-in-from-right duration-300">
+                    <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white/80 backdrop-blur-md sticky top-0 z-10 shrink-0">
+                        <h3 className="font-serif font-bold text-slate-800 flex items-center gap-2">
+                            <History size={18}/> 每日一卦记录
+                        </h3>
+                        <button onClick={() => setShowHistory(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                            <X size={18} className="text-slate-400"/>
+                        </button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar overscroll-contain">
+                        {historyList.length === 0 ? (
+                            <div className="text-center py-20 text-slate-400 text-sm">
+                                <Calendar size={32} className="mx-auto mb-3 opacity-30"/>
+                                <p>正在获取云端数据...</p>
+                            </div>
+                        ) : (
+                            historyList.map((record, idx) => (
+                                <div 
+                                    key={idx} 
+                                    onClick={() => { setDailyData(record); setShowHistory(false); }}
+                                    className={`bg-white border rounded-xl p-4 cursor-pointer transition-all hover:shadow-md group border-slate-100 hover:border-amber-200`}
+                                >
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div className="font-serif font-bold text-slate-800">{formatDate(record.date)}</div>
+                                        <div className={`text-xs font-bold px-1.5 py-0.5 rounded ${record.guidance.score >= 80 ? 'text-red-600 bg-red-50' : (record.guidance.score >= 60 ? 'text-amber-600 bg-amber-50' : 'text-slate-500 bg-slate-50')}`}>
+                                            {record.guidance.score}分
                                         </div>
                                     </div>
-                                ))
-                            )}
-                        </div>
+                                    <div className="text-xs text-slate-500 line-clamp-2 leading-relaxed mb-2">
+                                        {record.guidance.summary}
+                                    </div>
+                                    <div className="flex items-center justify-between pt-2 border-t border-slate-50">
+                                        <div className="flex gap-1">
+                                            {record.guidance.keywords?.slice(0, 2).map((k:string, i:number) => (
+                                                <span key={i} className="text-[9px] text-slate-400 bg-slate-50 px-1 rounded">#{k}</span>
+                                            ))}
+                                        </div>
+                                        <ChevronLeft size={14} className="text-slate-300 group-hover:text-amber-400 transition-colors rotate-180"/>
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
-                </>,
-                document.body
-            )}
+                </div>
+            </>,
+            document.body
+        )}
     </div>
   );
 };
