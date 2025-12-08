@@ -6,7 +6,8 @@ import { DivinationResult, AIProvider, UserProfile, CustomAIConfig, HistoryRecor
 import HexagramVisual from './HexagramVisual';
 import { getInterpretation } from '../services/geminiService';
 import AuthModal from './AuthModal';
-import { Sparkles, ArrowRight, RefreshCcw, Settings, X, Check, User, LogOut, RotateCcw, Loader2, Quote, BookOpen, Activity, History, ChevronRight, Lock, Hash } from 'lucide-react';
+import DailyDivination from './DailyDivination';
+import { Sparkles, ArrowLeft, RefreshCcw, Settings, X, Check, User, LogOut, RotateCcw, Loader2, Quote, BookOpen, Activity, History, ChevronRight, Lock, Hash, Calendar, ArrowRight } from 'lucide-react';
 
 // --- Markdown Renderer ---
 const FormattedMarkdown: React.FC<{ text: string }> = ({ text }) => {
@@ -93,6 +94,9 @@ const NumberSlot: React.FC<{ value: string; label: string; subLabel: string; onC
 
 // --- Main Component ---
 const DivinationTool: React.FC = () => {
+  // Mode Selection: 'menu', 'digital', 'daily'
+  const [mode, setMode] = useState<'menu' | 'digital' | 'daily'>('menu');
+
   const [inputs, setInputs] = useState<string[]>(['', '', '']);
   const [focusedSlot, setFocusedSlot] = useState<number | null>(null);
   const [question, setQuestion] = useState('');
@@ -122,8 +126,8 @@ const DivinationTool: React.FC = () => {
 
   // Fetch History
   useEffect(() => {
-      if (user.isLoggedIn && user.token) fetchHistory();
-  }, [user.isLoggedIn, user.token]);
+      if (user.isLoggedIn && user.token && mode === 'digital') fetchHistory();
+  }, [user.isLoggedIn, user.token, mode]);
 
   const fetchHistory = async () => {
       try {
@@ -197,7 +201,7 @@ const DivinationTool: React.FC = () => {
     ]);
   };
 
-  // --- Auth Guard ---
+  // --- Auth Guard (Common) ---
   if (!user.isLoggedIn) {
       return (
         <div className="flex flex-col items-center justify-center min-h-[60vh] animate-in fade-in zoom-in-95 duration-500 px-4">
@@ -208,7 +212,7 @@ const DivinationTool: React.FC = () => {
                     <Lock size={32} />
                 </div>
                 <div className="text-center">
-                    <h3 className="font-serif font-bold text-xl text-slate-800">数字起卦</h3>
+                    <h3 className="font-serif font-bold text-xl text-slate-800">开启探索</h3>
                     <p className="text-xs text-slate-400 mt-2 uppercase tracking-widest font-bold">Sign in to Start</p>
                 </div>
             </button>
@@ -216,10 +220,77 @@ const DivinationTool: React.FC = () => {
       );
   }
 
-  // --- Main Tool ---
+  // --- RENDER: Menu Mode ---
+  if (mode === 'menu') {
+      return (
+        <div className="max-w-4xl mx-auto px-4 py-8 animate-in fade-in slide-in-from-bottom-8 duration-500">
+             <div className="text-center mb-12">
+                 <h2 className="text-3xl font-serif font-bold text-slate-900 mb-2">易学实践</h2>
+                 <p className="text-slate-500 text-sm">选择一种方式，探索未知的指引</p>
+             </div>
+             
+             <div className="grid md:grid-cols-2 gap-6">
+                 {/* Card 1: Digital Divination */}
+                 <button 
+                    onClick={() => setMode('digital')}
+                    className="group relative bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100 hover:shadow-2xl hover:border-amber-200 hover:-translate-y-1 transition-all duration-300 text-left overflow-hidden"
+                 >
+                     <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 group-hover:scale-110 transition-all duration-500">
+                         <Hash size={120} />
+                     </div>
+                     <div className="relative z-10">
+                         <div className="w-14 h-14 bg-slate-900 text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:bg-amber-500 transition-colors duration-300">
+                             <Sparkles size={28} />
+                         </div>
+                         <h3 className="text-2xl font-serif font-bold text-slate-900 mb-3">灵数起卦</h3>
+                         <p className="text-slate-500 text-sm leading-relaxed mb-6 pr-8">
+                             心念所至，数由心生。输入三个数字，推演具体事宜的吉凶、过程与结果。
+                         </p>
+                         <div className="flex items-center text-xs font-bold uppercase tracking-widest text-slate-400 group-hover:text-amber-600 transition-colors">
+                             Start <ArrowRight size={14} className="ml-2 group-hover:translate-x-1 transition-transform" />
+                         </div>
+                     </div>
+                 </button>
+
+                 {/* Card 2: Daily Fortune */}
+                 <button 
+                    onClick={() => setMode('daily')}
+                    className="group relative bg-[#fffcf5] p-8 rounded-[2rem] shadow-sm border border-slate-100 hover:shadow-2xl hover:border-red-200 hover:-translate-y-1 transition-all duration-300 text-left overflow-hidden"
+                 >
+                     <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 group-hover:scale-110 transition-all duration-500">
+                         <Calendar size={120} />
+                     </div>
+                     <div className="relative z-10">
+                         <div className="w-14 h-14 bg-white border border-slate-200 text-slate-900 rounded-2xl flex items-center justify-center mb-6 shadow-sm group-hover:border-red-500 group-hover:text-red-600 transition-colors duration-300">
+                             <Quote size={28} />
+                         </div>
+                         <h3 className="text-2xl font-serif font-bold text-slate-900 mb-3">今日一卦</h3>
+                         <p className="text-slate-500 text-sm leading-relaxed mb-6 pr-8">
+                             晨起卜运，一日之计。获取今日的能量指引、宜忌建议与运势评分。
+                         </p>
+                         <div className="flex items-center text-xs font-bold uppercase tracking-widest text-slate-400 group-hover:text-red-600 transition-colors">
+                             Open <ArrowRight size={14} className="ml-2 group-hover:translate-x-1 transition-transform" />
+                         </div>
+                     </div>
+                 </button>
+             </div>
+        </div>
+      );
+  }
+
+  // --- RENDER: Daily Mode ---
+  if (mode === 'daily') {
+      return (
+          <div className="animate-in fade-in zoom-in-95 duration-300">
+              <DailyDivination onBack={() => setMode('menu')} />
+          </div>
+      );
+  }
+
+  // --- RENDER: Digital Divination Mode (Existing Logic) ---
   return (
-      <div className="w-full space-y-8 pb-32">
-        {/* Settings Modal (Simplified for brevity in XML, logic same as before) */}
+      <div className="w-full space-y-8 pb-32 animate-in slide-in-from-right-8 fade-in duration-300">
+        {/* Settings Modal */}
         {showSettings && (
              <div className="fixed inset-0 z-[150] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
                  <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-6">
@@ -227,7 +298,6 @@ const DivinationTool: React.FC = () => {
                          <h3 className="font-bold text-lg">设置</h3>
                          <button onClick={() => setShowSettings(false)}><X/></button>
                      </div>
-                     {/* Config Options... */}
                      <div className="flex justify-end">
                         <button onClick={() => setShowSettings(false)} className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm">完成</button>
                      </div>
@@ -240,9 +310,14 @@ const DivinationTool: React.FC = () => {
             <div className="bg-white rounded-[1.5rem] p-6 md:p-8 space-y-6 relative z-10">
                 {/* Header */}
                 <div className="flex justify-between items-center">
-                    <div>
-                        <h2 className="text-2xl font-serif font-bold text-slate-900">灵数起卦</h2>
-                        <p className="text-xs text-slate-400 mt-1">请输入三个三位数，或随机生成</p>
+                    <div className="flex items-center gap-3">
+                        <button onClick={() => setMode('menu')} className="p-2 -ml-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors">
+                            <ArrowLeft size={20} />
+                        </button>
+                        <div>
+                            <h2 className="text-2xl font-serif font-bold text-slate-900">灵数起卦</h2>
+                            <p className="text-xs text-slate-400 mt-1">请输入三个三位数，或随机生成</p>
+                        </div>
                     </div>
                     <div className="flex gap-2">
                         <button onClick={handleRandom} className="p-3 rounded-xl bg-slate-50 text-slate-500 hover:bg-slate-100 transition-colors" title="随机生成">

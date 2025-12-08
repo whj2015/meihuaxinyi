@@ -3,11 +3,10 @@ import React, { useState } from 'react';
 import Roadmap from './components/Roadmap';
 import DivinationTool from './components/DivinationTool';
 import HexagramLib from './components/HexagramLib';
-import DailyDivination from './components/DailyDivination';
-import { BookOpen, Compass, Library, Sun } from 'lucide-react';
+import { BookOpen, Compass, Library } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'learn' | 'practice' | 'library' | 'daily'>('daily');
+  const [activeTab, setActiveTab] = useState<'learn' | 'practice' | 'library'>('practice');
 
   return (
     <div className="min-h-screen bg-[#fdfbf7] text-slate-800 font-sans selection:bg-amber-100 pb-24 md:pb-0">
@@ -17,7 +16,7 @@ export default function App() {
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-center md:justify-between relative">
           
           {/* Brand */}
-          <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setActiveTab('daily')}>
+          <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setActiveTab('practice')}>
             <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-white font-serif font-bold text-lg shadow-md">
                 易
             </div>
@@ -28,10 +27,9 @@ export default function App() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex gap-1 bg-white p-1 rounded-full border border-slate-100 shadow-sm">
-            <NavButton active={activeTab === 'learn'} onClick={() => setActiveTab('learn')} icon={<BookOpen size={14} />} label="心法" />
-            <NavButton active={activeTab === 'library'} onClick={() => setActiveTab('library')} icon={<Library size={14} />} label="卦典" />
             <NavButton active={activeTab === 'practice'} onClick={() => setActiveTab('practice')} icon={<Compass size={14} />} label="起卦" />
-            <NavButton active={activeTab === 'daily'} onClick={() => setActiveTab('daily')} icon={<Sun size={14} />} label="今日" />
+            <NavButton active={activeTab === 'library'} onClick={() => setActiveTab('library')} icon={<Library size={14} />} label="卦典" />
+            <NavButton active={activeTab === 'learn'} onClick={() => setActiveTab('learn')} icon={<BookOpen size={14} />} label="心法" />
           </nav>
 
         </div>
@@ -42,12 +40,6 @@ export default function App() {
         {activeTab === 'learn' && (
              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                  <Roadmap />
-             </div>
-        )}
-        
-        {activeTab === 'daily' && (
-             <div className="animate-in fade-in zoom-in-95 duration-500">
-                <DailyDivination />
              </div>
         )}
 
@@ -66,8 +58,7 @@ export default function App() {
       
       {/* Mobile Bottom Navigation Bar - Floating Style */}
       <div className="md:hidden fixed bottom-6 left-6 right-6 z-50">
-        <div className="bg-slate-900/90 backdrop-blur-xl rounded-2xl shadow-2xl shadow-slate-900/20 border border-slate-800 flex justify-between items-center px-6 py-4">
-            <MobileNavItem active={activeTab === 'daily'} onClick={() => setActiveTab('daily')} icon={<Sun size={20} />} label="晨卜" />
+        <div className="bg-slate-900/90 backdrop-blur-xl rounded-2xl shadow-2xl shadow-slate-900/20 border border-slate-800 flex justify-between items-center px-8 py-4">
             <MobileNavItem active={activeTab === 'practice'} onClick={() => setActiveTab('practice')} icon={<Compass size={20} />} label="起卦" />
             <MobileNavItem active={activeTab === 'library'} onClick={() => setActiveTab('library')} icon={<Library size={20} />} label="卦典" />
             <MobileNavItem active={activeTab === 'learn'} onClick={() => setActiveTab('learn')} icon={<BookOpen size={20} />} label="心法" />

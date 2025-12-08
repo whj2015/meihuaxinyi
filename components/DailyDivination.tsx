@@ -6,7 +6,7 @@ import { DivinationResult, AIProvider, UserProfile } from '../types';
 import { getDailyGuidance } from '../services/geminiService';
 import HexagramVisual from './HexagramVisual';
 import AuthModal from './AuthModal';
-import { Sparkles, History, X, User, Lock, LogIn, Quote, ArrowRight, Share2, Calendar } from 'lucide-react';
+import { History, X, User, Lock, Quote, ArrowLeft } from 'lucide-react';
 
 interface DailyData {
   date: string; 
@@ -44,7 +44,12 @@ const TaiChiSpinner = ({ spinning }: { spinning: boolean }) => (
   </div>
 );
 
-const DailyDivination: React.FC = () => {
+// New Prop Interface
+interface DailyDivinationProps {
+  onBack?: () => void;
+}
+
+const DailyDivination: React.FC<DailyDivinationProps> = ({ onBack }) => {
   const [dailyData, setDailyData] = useState<DailyData | null>(null);
   const [historyList, setHistoryList] = useState<DailyData[]>([]);
   const [showHistory, setShowHistory] = useState(false);
@@ -197,21 +202,28 @@ const DailyDivination: React.FC = () => {
      const isToday = date === new Date().toISOString().split('T')[0];
 
      return (
-        <div className="max-w-lg mx-auto pb-24 px-4 pt-6">
+        <div className="max-w-lg mx-auto pb-24 px-0 md:px-4 pt-2">
              <AuthModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} onSuccess={handleLoginSuccess}/>
 
              {/* Header Actions */}
-             <div className="flex justify-between items-center mb-6">
-                 {isToday ? (
-                     <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                        <span className="text-xs font-bold text-slate-800 tracking-widest uppercase">Today's Fortune</span>
-                     </div>
-                 ) : (
-                     <span className="text-xs font-bold text-slate-400 flex items-center gap-1 bg-slate-100 px-3 py-1 rounded-full">
-                        <History size={12}/> {date}
-                     </span>
-                 )}
+             <div className="flex justify-between items-center mb-6 px-2">
+                 <div className="flex items-center gap-4">
+                     {onBack && (
+                         <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full text-slate-600 transition-colors">
+                             <ArrowLeft size={20} />
+                         </button>
+                     )}
+                     {isToday ? (
+                         <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                            <span className="text-xs font-bold text-slate-800 tracking-widest uppercase">Today's Fortune</span>
+                         </div>
+                     ) : (
+                         <span className="text-xs font-bold text-slate-400 flex items-center gap-1 bg-slate-100 px-3 py-1 rounded-full">
+                            <History size={12}/> {date}
+                         </span>
+                     )}
+                 </div>
                  <button onClick={() => {setShowHistory(true); fetchHistoryData();}} className="p-2 bg-white rounded-full shadow-sm border border-slate-100 text-slate-500 hover:text-slate-800 active:scale-95 transition-all">
                     <History size={18} />
                  </button>
@@ -314,10 +326,22 @@ const DailyDivination: React.FC = () => {
      );
   }
 
-  // --- View: Initial Start Screen ---
+  // --- View: Initial Start Screen (Embedded Mode) ---
   return (
-    <div className="flex flex-col items-center justify-center min-h-[75vh] animate-in fade-in zoom-in-95 duration-700 px-4">
+    <div className="flex flex-col items-center justify-center min-h-[60vh] animate-in fade-in zoom-in-95 duration-700 px-4">
         <AuthModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} onSuccess={handleLoginSuccess}/>
+
+        {/* Header for Embedded Mode */}
+        {onBack && (
+            <div className="w-full max-w-md flex items-center mb-8 relative">
+                <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full text-slate-600 transition-colors absolute left-0">
+                    <ArrowLeft size={20} />
+                </button>
+                <div className="w-full text-center pointer-events-none">
+                    <h2 className="font-serif font-bold text-xl text-slate-900">晨起占运</h2>
+                </div>
+            </div>
+        )}
 
         <div onClick={() => !user.isLoggedIn ? setShowLoginModal(true) : startDivination()}>
              <TaiChiSpinner spinning={false} />
