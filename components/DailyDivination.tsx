@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { calculateDivination } from '../utils/meiHuaLogic';
@@ -6,13 +5,13 @@ import { DivinationResult, AIProvider, UserProfile } from '../types';
 import { getDailyGuidance } from '../services/geminiService';
 import HexagramVisual from './HexagramVisual';
 import AuthModal from './AuthModal';
-import { Sparkles, Sun, CheckCircle, XCircle, Calendar, Star, History, X, ChevronRight, ArrowUp, ArrowDown, MoveHorizontal, GitCommit, ChevronLeft, Lock, User, Loader2, LogIn, ArrowRight, LogOut } from 'lucide-react';
+import { Sparkles, Sun, CheckCircle, XCircle, Calendar, History, X, ChevronLeft, Lock, User, Loader2, LogIn, LogOut, ArrowRight, ArrowUp, ArrowDown, MoveHorizontal, GitCommit, ChevronRight, Quote } from 'lucide-react';
 
 interface DailyData {
-  date: string; // YYYY-MM-DD
+  date: string; 
   timestamp: number;
   result: DivinationResult;
-  guidance: any; // JSON object from AI
+  guidance: any; 
 }
 
 const DailyDivination: React.FC = () => {
@@ -23,89 +22,58 @@ const DailyDivination: React.FC = () => {
   
   const [isAnimating, setIsAnimating] = useState(false);
   const [loadingAI, setLoadingAI] = useState(false);
-  const [isLoadingToday, setIsLoadingToday] = useState(false); // New: Loading state for initial check
-  const [animationStep, setAnimationStep] = useState(0); // 0: Idle, 1: Breathing, 2: Revealing
+  const [isLoadingToday, setIsLoadingToday] = useState(false);
+  const [animationStep, setAnimationStep] = useState(0);
 
-  // Config & User
   const [provider, setProvider] = useState<AIProvider>('deepseek');
   const [guestApiKeys, setGuestApiKeys] = useState({ gemini: '', deepseek: '' });
   const [user, setUser] = useState<UserProfile>({ isLoggedIn: false, username: '' });
 
-  // Init User & Listen for Storage Changes (Sync across tabs/components)
+  // Init User & Listen for Storage Changes
   useEffect(() => {
     const loadUser = () => {
         const savedUserStr = localStorage.getItem('user_profile');
         if (savedUserStr) {
             const parsedUser = JSON.parse(savedUserStr);
-            // Verify if user actually changed to avoid redundant fetches
             if (parsedUser.username !== user.username || parsedUser.token !== user.token) {
                 setUser(parsedUser);
                 if (parsedUser.isLoggedIn && parsedUser.token) {
                     fetchTodayData(parsedUser.token);
                 }
             }
-        } else {
-            // User logged out elsewhere
-            if (user.isLoggedIn) {
-                handleLogout();
-            }
+        } else if (user.isLoggedIn) {
+            handleLogout();
         }
     };
-
     loadUser();
-
-    // Listener for cross-tab or cross-component updates
-    const handleStorageChange = (e: StorageEvent) => {
-        if (e.key === 'user_profile') {
-            loadUser();
-        }
-    };
-    
+    const handleStorageChange = (e: StorageEvent) => { if (e.key === 'user_profile') loadUser(); };
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [user.username, user.token, user.isLoggedIn]);
 
-  // Load Provider Config
   useEffect(() => {
     const savedProvider = localStorage.getItem('ai_provider') as AIProvider;
     if (savedProvider) setProvider(savedProvider);
   }, []);
 
-  // Fetch today's data from server
   const fetchTodayData = async (token: string) => {
       setIsLoadingToday(true);
       try {
         const today = new Date().toISOString().split('T')[0];
-        const res = await fetch(`/api/daily-reading?date=${today}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await fetch(`/api/daily-reading?date=${today}`, { headers: { 'Authorization': `Bearer ${token}` } });
         const json = await res.json();
-        if (json.success && json.data) {
-            setDailyData(json.data);
-        } else {
-            setDailyData(null);
-        }
-      } catch (e) {
-          console.error("Failed to fetch today's reading", e);
-          setDailyData(null);
-      } finally {
-          setIsLoadingToday(false);
-      }
+        if (json.success && json.data) setDailyData(json.data);
+        else setDailyData(null);
+      } catch (e) { setDailyData(null); } finally { setIsLoadingToday(false); }
   };
 
   const fetchHistoryData = async () => {
       if (!user.token) return;
       try {
-          const res = await fetch('/api/daily-history', {
-              headers: { 'Authorization': `Bearer ${user.token}` }
-          });
+          const res = await fetch('/api/daily-history', { headers: { 'Authorization': `Bearer ${user.token}` } });
           const json = await res.json();
-          if (json.success) {
-              setHistoryList(json.data);
-          }
-      } catch (e) {
-          console.error("Failed to fetch history", e);
-      }
+          if (json.success) setHistoryList(json.data);
+      } catch (e) { console.error(e); }
   };
 
   const saveToServer = async (data: DailyData) => {
@@ -113,24 +81,16 @@ const DailyDivination: React.FC = () => {
       try {
           await fetch('/api/daily-reading', {
               method: 'POST',
-              headers: { 
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${user.token}`
-              },
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${user.token}` },
               body: JSON.stringify(data)
           });
-          // Refresh history silently
           fetchHistoryData();
-      } catch (e) {
-          console.error("Failed to save reading", e);
-      }
+      } catch (e) { console.error(e); }
   };
 
   const handleLoginSuccess = (newUser: UserProfile) => {
       setUser(newUser);
-      if (newUser.token) {
-          fetchTodayData(newUser.token);
-      }
+      if (newUser.token) fetchTodayData(newUser.token);
   };
 
   const handleLogout = () => {
@@ -138,44 +98,25 @@ const DailyDivination: React.FC = () => {
       localStorage.removeItem('user_profile');
       setDailyData(null);
       setHistoryList([]);
-      // Dispatch event for other components
       window.dispatchEvent(new Event("storage"));
-  };
-
-  const handleStartClick = () => {
-      if (!user.isLoggedIn) {
-          setShowLoginModal(true);
-      } else {
-          startDivination();
-      }
   };
 
   const startDivination = async () => {
     setIsAnimating(true);
     setAnimationStep(1);
-
-    // 1. Animation Sequence
-    setTimeout(() => setAnimationStep(2), 2000); // 2s breathing
+    setTimeout(() => setAnimationStep(2), 2000); 
     
-    // 2. Generate Result Logic
     setTimeout(async () => {
         const n1 = Math.floor(Math.random() * 800) + 100;
         const n2 = Math.floor(Math.random() * 800) + 100;
         const n3 = Math.floor(Math.random() * 800) + 100;
         const res = calculateDivination(n1, n2, n3);
         
-        // 3. Fetch AI Guidance
         setLoadingAI(true);
         const today = new Date().toISOString().split('T')[0];
+        let currentKey = provider === 'gemini' ? guestApiKeys.gemini : '';
         
-        let currentKey = '';
-        if (provider === 'gemini') currentKey = guestApiKeys.gemini;
-        
-        // Fallback: Try to use system defaults via proxy if logged in, handled by service
-        const guidance = await getDailyGuidance(res, provider, {
-            token: user.token,
-            apiKey: currentKey
-        });
+        const guidance = await getDailyGuidance(res, provider, { token: user.token, apiKey: currentKey });
 
         const newData: DailyData = {
             date: today,
@@ -183,36 +124,20 @@ const DailyDivination: React.FC = () => {
             result: res,
             guidance: guidance || { 
                 summary: "心诚则灵，卦象自现。", 
-                fortune: "网络连接波动，未能获取详细AI解读，但卦象已成。请参考下方【本卦】(现状)、【互卦】(过程)与【变卦】(结果)之象，结合动爻与体用关系自行体悟。",
+                fortune: "网络波动，请参考下方卦象自行体悟。",
                 score: 60,
                 keywords: ["自省", "观察"],
-                todo: ["静心", "记录"],
-                not_todo: ["急躁", "妄动"]
+                todo: ["静心"],
+                not_todo: ["急躁"]
             }
         };
 
-        await saveToServer(newData); // Save to DB
+        await saveToServer(newData);
         setDailyData(newData);
         setIsAnimating(false);
         setLoadingAI(false);
         setAnimationStep(0);
-    }, 4500); // Total animation duration
-  };
-
-  const handleShowHistory = () => {
-      setShowHistory(true);
-      fetchHistoryData();
-  };
-
-  const getRelationVisual = (score: string) => {
-    switch (score) {
-        case 'Great Auspicious': return { arrow: <ArrowUp size={24} className="text-red-500" />, desc: '大吉 · 生助', color: 'text-red-600 bg-red-50 border-red-100' };
-        case 'Minor Auspicious': return { arrow: <ArrowUp size={24} className="text-orange-500" />, desc: '小吉 · 比/克', color: 'text-orange-600 bg-orange-50 border-orange-100' };
-        case 'Auspicious': return { arrow: <ArrowUp size={24} className="text-red-500" />, desc: '吉 · 比和', color: 'text-red-600 bg-red-50 border-red-100' };
-        case 'Minor Bad': return { arrow: <ArrowDown size={24} className="text-slate-400" />, desc: '小凶 · 生用', color: 'text-slate-500 bg-slate-50 border-slate-200' };
-        case 'Great Bad': return { arrow: <ArrowDown size={24} className="text-green-700" />, desc: '大凶 · 克体', color: 'text-green-700 bg-green-50 border-green-100' };
-        default: return { arrow: <MoveHorizontal size={24} className="text-slate-300" />, desc: '平', color: 'text-slate-500 bg-slate-50' };
-    }
+    }, 4500); 
   };
 
   const formatDate = (dateStr: string) => {
@@ -220,402 +145,173 @@ const DailyDivination: React.FC = () => {
       return date.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' });
   };
 
-  // --- Render: Loading Phase ---
-  if (isLoadingToday) {
-      return (
-        <div className="flex flex-col items-center justify-center min-h-[60vh] animate-in fade-in">
-             <Loader2 size={32} className="animate-spin text-slate-300 mb-4"/>
-             <p className="text-slate-400 text-xs font-serif tracking-widest">正在连接云端...</p>
-        </div>
-      );
-  }
+  if (isLoadingToday) return <div className="flex flex-col items-center justify-center min-h-[50vh]"><Loader2 size={32} className="animate-spin text-slate-300 mb-2"/><p className="text-xs text-slate-400">连接云端...</p></div>;
 
-  // --- Render: Animation Phase ---
   if (isAnimating) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] animate-in fade-in duration-700">
-        <div className="relative w-64 h-64 flex items-center justify-center">
-            {/* Background Glows */}
-            <div className={`absolute inset-0 bg-amber-100 rounded-full blur-3xl opacity-50 transition-all duration-[2000ms] ${animationStep === 1 ? 'scale-110' : 'scale-75'}`}></div>
-            <div className={`absolute inset-0 bg-slate-100 rounded-full blur-2xl opacity-40 animate-pulse`}></div>
-            
-            {/* Taiji Symbol (Simplified CSS representation) */}
-            <div className={`w-32 h-32 rounded-full border-[12px] border-slate-800 border-t-slate-800 border-r-slate-800 border-b-amber-500 border-l-amber-500 animate-spin duration-[3000ms] shadow-2xl ${animationStep === 2 ? 'speed-up' : ''}`}></div>
-            
-            {/* Center Text */}
-            <div className="absolute font-serif text-slate-800 font-bold tracking-widest text-lg animate-pulse">
-                {animationStep === 1 ? "凝神..." : "感应..."}
-            </div>
-        </div>
-        <p className="mt-8 text-slate-400 font-serif tracking-widest text-sm">
-            {loadingAI ? "正在解析天机..." : "心诚则灵 · 随机而动"}
-        </p>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] animate-in fade-in duration-700 relative overflow-hidden">
+        <div className={`w-32 h-32 rounded-full border-[8px] border-slate-800 border-t-transparent border-l-amber-500 animate-spin duration-[2000ms] shadow-2xl`}></div>
+        <div className="absolute font-serif text-slate-800 font-bold tracking-widest text-lg animate-pulse mt-1">{animationStep === 1 ? "凝神" : "感应"}</div>
+        <p className="mt-12 text-slate-400 text-xs tracking-widest">{loadingAI ? "正在解析天机..." : "心诚则灵"}</p>
       </div>
     );
   }
 
-  // --- Render: Result Phase ---
+  // --- Result View ---
   if (dailyData) {
      const { result, guidance, date } = dailyData;
-     const tiTrigram = result.tiGua === 'upper' ? result.originalHexagram.upper : result.originalHexagram.lower;
-     const yongTrigram = result.yongGua === 'upper' ? result.originalHexagram.upper : result.originalHexagram.lower;
-     const relationInfo = getRelationVisual(result.relationScore);
      const isToday = date === new Date().toISOString().split('T')[0];
 
      return (
-        <div className="max-w-3xl mx-auto space-y-5 animate-in fade-in slide-in-from-bottom-8 duration-700 pb-20">
-             {/* Unified Auth Modal */}
-             <AuthModal 
-                isOpen={showLoginModal} 
-                onClose={() => setShowLoginModal(false)}
-                onSuccess={handleLoginSuccess}
-             />
+        <div className="max-w-2xl mx-auto space-y-4 animate-in fade-in slide-in-from-bottom-8 duration-700 pb-24">
+             <AuthModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} onSuccess={handleLoginSuccess}/>
 
-             {/* User Status Bar */}
-             {user.isLoggedIn && (
-                <div className="flex justify-between items-center px-4 py-2 bg-white/60 backdrop-blur rounded-full border border-slate-100 shadow-sm mx-2">
-                    <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 bg-slate-200 rounded-full flex items-center justify-center text-slate-500 text-xs font-bold">
-                            {user.username.charAt(0).toUpperCase()}
-                        </div>
-                        <span className="text-xs text-slate-500 font-medium">当前账号: <span className="text-slate-700">{user.username}</span></span>
-                    </div>
-                    <button onClick={handleLogout} className="text-xs text-slate-400 hover:text-red-500 flex items-center gap-1 transition-colors">
-                        <LogOut size={12}/> 退出
-                    </button>
-                </div>
-             )}
-
-             {/* Header Actions */}
-             <div className="flex justify-between items-center px-4 md:px-2 pt-2">
+             {/* Top Bar */}
+             <div className="flex justify-between items-center px-1">
                  {isToday ? (
-                     <span className="inline-flex items-center gap-2 text-xs text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-100 font-bold shadow-sm">
-                        <Sun size={12}/> 今日运势已生成
-                     </span>
+                     <span className="text-xs font-bold text-amber-600 bg-amber-50 px-3 py-1 rounded-full border border-amber-100 flex items-center gap-1"><Sun size={12}/>今日运势</span>
                  ) : (
-                     <span className="inline-flex items-center gap-2 text-xs text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full font-bold shadow-sm">
-                        <History size={12}/> 历史回溯：{date}
-                     </span>
+                     <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full flex items-center gap-1"><History size={12}/>历史: {date}</span>
                  )}
-                 <button onClick={handleShowHistory} className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 transition-all shadow-sm">
-                    <History size={16} /> <span className="text-xs font-bold">历史记录</span>
-                 </button>
+                 <button onClick={() => {setShowHistory(true); fetchHistoryData();}} className="text-xs font-bold text-slate-500 bg-white border px-3 py-1 rounded-full flex items-center gap-1 shadow-sm"><History size={12} />记录</button>
              </div>
 
-             {/* 1. Luck Card (Mobile Optimized) */}
-             <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden relative group">
-                {/* Decorative Background */}
-                <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-amber-50/80 to-transparent rounded-bl-[100px] -z-0"></div>
+             {/* Main Luck Card */}
+             <div className="bg-white rounded-[1.5rem] shadow-sm border border-slate-100 overflow-hidden relative">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-amber-50 rounded-full blur-3xl -z-0"></div>
                 
-                <div className="p-6 md:p-8 relative z-10">
-                    <div className="flex justify-between items-start mb-6">
+                <div className="p-6">
+                    <div className="flex justify-between items-end mb-6">
                         <div>
-                            <h2 className="text-lg md:text-2xl font-serif font-bold text-slate-900 flex flex-col md:block">
-                                <span>{formatDate(date)}</span>
-                            </h2>
-                            <div className="flex flex-wrap gap-2 mt-2">
+                            <div className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">Fortune Score</div>
+                            <div className="text-5xl font-serif font-bold text-slate-800 leading-none">{guidance.score}</div>
+                        </div>
+                        <div className="text-right">
+                            <div className="font-serif font-bold text-lg text-slate-900">{formatDate(date)}</div>
+                            <div className="flex gap-1 justify-end mt-1">
                                 {guidance.keywords?.map((k: string, i: number) => (
-                                    <span key={i} className="text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-white/60 px-2 py-0.5 rounded border border-slate-200/50 backdrop-blur-sm">#{k}</span>
+                                    <span key={i} className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">#{k}</span>
                                 ))}
                             </div>
                         </div>
-                        <div className="flex flex-col items-end">
-                            <div className="text-5xl font-serif font-bold text-slate-800 leading-none">{guidance.score}<span className="text-xs text-slate-400 font-sans font-normal ml-1 align-top mt-2 inline-block">分</span></div>
-                        </div>
                     </div>
 
-                    <div className="p-5 bg-[#fbfbf9] rounded-2xl border border-slate-100/80 mb-6 relative">
-                        <span className="absolute -top-3 left-4 bg-white px-2 text-amber-500"><Sparkles size={16}/></span>
-                        <p className="font-serif text-lg md:text-xl text-slate-800 leading-relaxed text-center font-medium">
-                            “{guidance.summary}”
+                    <div className="bg-[#fcfbf9] p-5 rounded-2xl border border-dashed border-slate-200 mb-6 relative">
+                        <Quote className="absolute -top-3 left-4 bg-[#fcfbf9] px-1 text-slate-300" size={24} fill="currentColor"/>
+                        <p className="font-serif text-lg text-slate-800 leading-relaxed text-center font-medium pt-2">
+                            {guidance.summary}
                         </p>
                     </div>
                     
-                    <div className="flex flex-col md:flex-row gap-4 mb-6">
-                        <div className="flex-1 space-y-2">
-                            <div className="flex items-center gap-2">
-                                <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-600"><CheckCircle size={12}/></div>
-                                <span className="text-xs font-bold text-slate-400">宜</span>
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                        <div className="bg-green-50/50 p-3 rounded-xl border border-green-100/50">
+                            <div className="flex items-center gap-1.5 mb-2">
+                                <CheckCircle size={14} className="text-green-600"/>
+                                <span className="text-xs font-bold text-green-800">宜</span>
                             </div>
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-1.5">
                                 {guidance.todo?.map((t: string, i: number) => (
-                                    <span key={i} className="px-3 py-1.5 bg-green-50 text-green-800 text-xs rounded-lg border border-green-100/50 font-medium">{t}</span>
+                                    <span key={i} className="px-2 py-1 bg-white text-green-700 text-xs rounded border border-green-100 shadow-sm">{t}</span>
                                 ))}
                             </div>
                         </div>
-                        <div className="flex-1 space-y-2">
-                            <div className="flex items-center gap-2">
-                                <div className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center text-red-600"><XCircle size={12}/></div>
-                                <span className="text-xs font-bold text-slate-400">忌</span>
+                        <div className="bg-red-50/50 p-3 rounded-xl border border-red-100/50">
+                            <div className="flex items-center gap-1.5 mb-2">
+                                <XCircle size={14} className="text-red-600"/>
+                                <span className="text-xs font-bold text-red-800">忌</span>
                             </div>
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-1.5">
                                 {guidance.not_todo?.map((t: string, i: number) => (
-                                    <span key={i} className="px-3 py-1.5 bg-red-50 text-red-800 text-xs rounded-lg border border-red-100/50 font-medium">{t}</span>
+                                    <span key={i} className="px-2 py-1 bg-white text-red-700 text-xs rounded border border-red-100 shadow-sm">{t}</span>
                                 ))}
                             </div>
                         </div>
                     </div>
 
-                    <div className="border-t border-slate-100 pt-5">
-                        <h3 className="font-serif font-bold text-slate-800 mb-3 flex items-center gap-2 text-sm">
-                             大师指引
-                        </h3>
-                        <p className="text-slate-600 leading-7 text-justify text-sm md:text-base">
-                            {guidance.fortune}
-                        </p>
+                    <div className="text-sm text-slate-600 leading-7 text-justify border-t border-slate-100 pt-4">
+                        <span className="font-bold text-slate-800 mr-1">大师指引：</span>{guidance.fortune}
                     </div>
                 </div>
              </div>
 
-             {/* 2. Detailed Hexagram Flow */}
-             <div className="bg-white rounded-[2rem] p-5 md:p-8 shadow-sm border border-slate-100/60">
-                 <div className="text-center mb-6 md:mb-8">
-                     <h3 className="text-base md:text-lg font-serif font-bold text-slate-800">卦象演变详解</h3>
-                 </div>
-                 
-                 {/* Mobile: Vertical Stack, Desktop: Horizontal. REMOVED scale-75 hack. */}
-                 <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-8">
-                    {/* Original */}
-                    <div className="flex flex-row md:flex-col items-center gap-4 md:gap-2 w-full md:w-auto justify-between md:justify-center p-3 md:p-0 bg-slate-50 md:bg-transparent rounded-xl md:rounded-none">
-                        <span className="md:hidden text-xs font-bold text-slate-500 w-12">本卦</span>
-                        <div><HexagramVisual hexagram={result.originalHexagram} label="" highlight={result.tiGua} movingLine={result.movingLine}/></div>
-                        <span className="hidden md:block mt-2 text-xs text-slate-400 font-mono">Start</span>
+             {/* Compact Hexagram Display */}
+             <div className="bg-white rounded-[1.5rem] p-5 shadow-sm border border-slate-100">
+                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 text-center">卦象演变</h3>
+                 <div className="flex items-center justify-between px-2">
+                    <div className="flex flex-col items-center gap-2">
+                        <HexagramVisual hexagram={result.originalHexagram} label="" highlight={result.tiGua}/>
+                        <span className="text-[10px] text-slate-400">本卦</span>
                     </div>
-                    
-                    <div className="hidden md:flex flex-col items-center justify-center opacity-30">
-                        <ChevronRight className="text-slate-400" size={16}/>
-                    </div>
-
-                    {/* Mutual */}
-                    <div className="flex flex-row md:flex-col items-center gap-4 md:gap-2 w-full md:w-auto justify-between md:justify-center p-3 md:p-0 bg-slate-50 md:bg-transparent rounded-xl md:rounded-none">
-                         <span className="md:hidden text-xs font-bold text-slate-500 w-12">互卦</span>
-                         <div className="relative">
+                    <ChevronRight className="text-slate-200" size={20}/>
+                    <div className="flex flex-col items-center gap-2">
+                        <div className="relative">
                             <HexagramVisual hexagram={result.huHexagram} label=""/>
-                            <div className="absolute -top-3 -right-3 w-6 h-6 bg-slate-50 rounded-full flex items-center justify-center border border-white shadow-sm text-slate-300"><GitCommit size={12}/></div>
-                         </div>
-                         <span className="hidden md:block mt-2 text-xs text-slate-400 font-mono">Process</span>
+                            <div className="absolute -top-2 -right-2 w-4 h-4 bg-slate-50 rounded-full border border-slate-200 flex items-center justify-center"><GitCommit size={8} className="text-slate-400"/></div>
+                        </div>
+                        <span className="text-[10px] text-slate-400">互卦</span>
                     </div>
-
-                    <div className="hidden md:flex flex-col items-center justify-center opacity-30">
-                        <ChevronRight className="text-slate-400" size={16}/>
+                    <ChevronRight className="text-slate-200" size={20}/>
+                    <div className="flex flex-col items-center gap-2">
+                        <HexagramVisual hexagram={result.changedHexagram} label=""/>
+                        <span className="text-[10px] text-slate-400">变卦</span>
                     </div>
-
-                    {/* Changed */}
-                    <div className="flex flex-row md:flex-col items-center gap-4 md:gap-2 w-full md:w-auto justify-between md:justify-center p-3 md:p-0 bg-slate-50 md:bg-transparent rounded-xl md:rounded-none">
-                        <span className="md:hidden text-xs font-bold text-slate-500 w-12">变卦</span>
-                        <div><HexagramVisual hexagram={result.changedHexagram} label=""/></div>
-                        <span className="hidden md:block mt-2 text-xs text-slate-400 font-mono">End</span>
-                    </div>
-                </div>
-             </div>
-
-             {/* 3. Relation Logic */}
-             <div className="bg-white p-5 md:p-8 rounded-[2rem] border border-slate-100 shadow-sm">
-                 <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                     <div className="flex-1 w-full">
-                         <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 text-center md:text-left">吉凶能量分析</h4>
-                         <div className="flex items-center justify-between gap-2 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                             <div className="text-center">
-                                 <span className="text-[10px] text-slate-400 block mb-1">自己 (体)</span>
-                                 <span className="font-serif font-bold text-lg text-slate-800">{tiTrigram.name} <span className="text-sm font-normal text-slate-500">({tiTrigram.element})</span></span>
-                             </div>
-                             <div className="flex flex-col items-center gap-1">
-                                {relationInfo.arrow}
-                                <span className="text-[10px] text-slate-400 font-medium">生克</span>
-                             </div>
-                             <div className="text-center">
-                                 <span className="text-[10px] text-slate-400 block mb-1">运势 (用)</span>
-                                 <span className="font-serif font-bold text-lg text-slate-800">{yongTrigram.name} <span className="text-sm font-normal text-slate-500">({yongTrigram.element})</span></span>
-                             </div>
-                         </div>
-                     </div>
-                     <div className={`p-4 md:p-5 rounded-2xl border flex flex-col items-center justify-center w-full md:w-auto ${relationInfo.color}`}>
-                         <span className="text-xs font-bold opacity-70 mb-1">综合判定</span>
-                         <span className="text-2xl font-serif font-bold">{relationInfo.desc.split('·')[0]}</span>
-                         <span className="text-[10px] opacity-80 mt-1">{relationInfo.desc.split('·')[1]}</span>
-                     </div>
                  </div>
              </div>
              
-             {/* History Sidebar Modal */}
-            {showHistory && createPortal(
-                <>
-                    <div 
-                        className="fixed inset-0 z-[140] bg-slate-900/30 backdrop-blur-sm animate-in fade-in duration-300"
-                        onClick={() => setShowHistory(false)}
-                    />
-                    <div className="fixed inset-y-0 right-0 z-[150] w-full md:w-80 bg-white shadow-2xl border-l border-slate-100 flex flex-col h-[100dvh] animate-in slide-in-from-right duration-300">
-                        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white/80 backdrop-blur-md sticky top-0 z-10 shrink-0">
-                            <h3 className="font-serif font-bold text-slate-800 flex items-center gap-2">
-                                <History size={18}/> 每日一卦记录
-                            </h3>
-                            <button onClick={() => setShowHistory(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-                                <X size={18} className="text-slate-400"/>
-                            </button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar overscroll-contain">
-                            {historyList.length === 0 ? (
-                                <div className="text-center py-20 text-slate-400 text-sm">
-                                    <Calendar size={32} className="mx-auto mb-3 opacity-30"/>
-                                    <p>暂无云端记录</p>
-                                    <p className="text-xs text-slate-300 mt-1">坚持每日一占，积累运势轨迹</p>
-                                </div>
-                            ) : (
-                                historyList.map((record, idx) => (
-                                    <div 
-                                        key={idx} 
-                                        onClick={() => { setDailyData(record); setShowHistory(false); }}
-                                        className={`bg-white border rounded-xl p-4 cursor-pointer transition-all hover:shadow-md group ${dailyData?.date === record.date ? 'border-amber-400 ring-1 ring-amber-100' : 'border-slate-100 hover:border-amber-200'}`}
-                                    >
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div className="font-serif font-bold text-slate-800">{formatDate(record.date)}</div>
-                                            <div className={`text-xs font-bold px-1.5 py-0.5 rounded ${record.guidance.score >= 80 ? 'text-red-600 bg-red-50' : (record.guidance.score >= 60 ? 'text-amber-600 bg-amber-50' : 'text-slate-500 bg-slate-50')}`}>
-                                                {record.guidance.score}分
-                                            </div>
-                                        </div>
-                                        <div className="text-xs text-slate-500 line-clamp-2 leading-relaxed mb-2">
-                                            {record.guidance.summary}
-                                        </div>
-                                        <div className="flex items-center justify-between pt-2 border-t border-slate-50">
-                                            <div className="flex gap-1">
-                                                {record.guidance.keywords?.slice(0, 2).map((k:string, i:number) => (
-                                                    <span key={i} className="text-[9px] text-slate-400 bg-slate-50 px-1 rounded">#{k}</span>
-                                                ))}
-                                            </div>
-                                            <ChevronLeft size={14} className="text-slate-300 group-hover:text-amber-400 transition-colors rotate-180"/>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
+             {/* History Drawer */}
+             {showHistory && createPortal(
+                <div className="fixed inset-0 z-[200] flex flex-col bg-slate-50 animate-in slide-in-from-right duration-300">
+                    <div className="bg-white px-4 py-3 border-b border-slate-100 flex justify-between items-center shrink-0 safe-top">
+                        <h3 className="font-bold text-lg">每日足迹</h3>
+                        <button onClick={() => setShowHistory(false)} className="p-2 bg-slate-100 rounded-full"><X size={20} /></button>
                     </div>
-                </>,
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-safe">
+                        {historyList.map((record, idx) => (
+                            <div key={idx} onClick={() => { setDailyData(record); setShowHistory(false); }} className={`bg-white p-4 rounded-xl border ${dailyData?.date === record.date ? 'border-amber-400 ring-1 ring-amber-50' : 'border-slate-100'} shadow-sm flex flex-col gap-2`}>
+                                <div className="flex justify-between items-center">
+                                    <span className="font-serif font-bold text-slate-800">{formatDate(record.date)}</span>
+                                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${record.guidance.score>=80?'bg-red-50 text-red-600':'bg-slate-100 text-slate-500'}`}>{record.guidance.score}分</span>
+                                </div>
+                                <p className="text-xs text-slate-500 line-clamp-1">{record.guidance.summary}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>,
                 document.body
-            )}
+             )}
         </div>
      );
   }
 
-  // --- Render: Initial Phase with Auth Guard ---
+  // --- Initial Auth View ---
   return (
-    <div className="flex flex-col items-center justify-center py-12 md:py-20 animate-in fade-in zoom-in-95 duration-500 px-4">
-        {/* Unified Auth Modal */}
-        <AuthModal 
-            isOpen={showLoginModal} 
-            onClose={() => setShowLoginModal(false)}
-            onSuccess={handleLoginSuccess}
-        />
+    <div className="flex flex-col items-center justify-center min-h-[60vh] animate-in fade-in zoom-in-95 duration-500 px-4">
+        <AuthModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} onSuccess={handleLoginSuccess}/>
 
-        <div className="relative group cursor-pointer" onClick={handleStartClick}>
-            <div className={`absolute inset-0 bg-amber-200 rounded-full blur-2xl transition-opacity duration-500 ${user.isLoggedIn ? 'opacity-30 group-hover:opacity-60' : 'opacity-0'}`}></div>
-            
-            <button className={`relative w-48 h-48 md:w-56 md:h-56 bg-white rounded-full border-4 shadow-xl flex flex-col items-center justify-center gap-2 transition-all duration-300 ${user.isLoggedIn ? 'border-slate-50 hover:scale-105 active:scale-95 group-hover:border-amber-100' : 'border-slate-100 grayscale hover:grayscale-0'}`}>
-                
-                {/* Locked Overlay */}
-                {!user.isLoggedIn && (
-                    <div className="absolute top-3 right-3 w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 shadow-sm border border-slate-200 z-10">
-                        <Lock size={14}/>
-                    </div>
-                )}
-
-                <div className={`w-20 h-20 md:w-24 md:h-24 rounded-full text-white flex items-center justify-center shadow-inner mb-2 transition-colors ${user.isLoggedIn ? 'bg-slate-900 group-hover:bg-slate-800' : 'bg-slate-200'}`}>
-                    {user.isLoggedIn ? (
-                        <span className="font-serif text-4xl md:text-5xl font-bold select-none">卦</span>
-                    ) : (
-                        <LogIn size={32} className="text-slate-400"/>
-                    )}
+        <div className="relative group cursor-pointer" onClick={() => !user.isLoggedIn ? setShowLoginModal(true) : startDivination()}>
+            <button className={`relative w-48 h-48 bg-white rounded-full border-4 shadow-xl flex flex-col items-center justify-center gap-2 transition-all duration-300 ${user.isLoggedIn ? 'border-slate-50 active:scale-95' : 'border-slate-100 grayscale'}`}>
+                {!user.isLoggedIn && <div className="absolute top-4 right-4 w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 border border-slate-100"><Lock size={14}/></div>}
+                <div className={`w-24 h-24 rounded-full text-white flex items-center justify-center shadow-inner mb-2 ${user.isLoggedIn ? 'bg-slate-900' : 'bg-slate-200'}`}>
+                    {user.isLoggedIn ? <span className="font-serif text-4xl font-bold">卦</span> : <LogIn size={32}/>}
                 </div>
-                <div className="text-center px-4">
-                    <div className="font-serif font-bold text-slate-800 text-lg md:text-xl">
-                        {user.isLoggedIn ? '今日一占' : '登录解锁'}
-                    </div>
-                    <div className="text-[10px] text-slate-400 font-sans tracking-widest uppercase mt-1 group-hover:text-amber-600 transition-colors">
-                        {user.isLoggedIn ? 'Daily Divination' : 'Login Required'}
-                    </div>
+                <div className="text-center">
+                    <div className="font-serif font-bold text-slate-800 text-lg">{user.isLoggedIn ? '今日一占' : '登录解锁'}</div>
+                    <div className="text-[10px] text-slate-400 uppercase tracking-widest">{user.isLoggedIn ? 'Daily Fortune' : 'Login Required'}</div>
                 </div>
             </button>
         </div>
         
-        <div className="mt-12 text-center max-w-sm mx-auto px-4">
+        <div className="mt-12 text-center max-w-xs mx-auto">
             <h3 className="text-slate-800 font-serif font-bold mb-2">{formatDate(new Date().toISOString())}</h3>
-            <p className="text-sm text-slate-500 leading-relaxed mb-6">
-                每日清晨，静心诚意。<br/>
-                {user.isLoggedIn ? "抽取今日卦象，洞察气运流转。" : "天机珍贵，专属留存。登录后即可开启每日运势。"}
+            <p className="text-sm text-slate-400 leading-relaxed mb-6">
+                {user.isLoggedIn ? "每日清晨，静心诚意。" : "天机珍贵，专属留存。"}
             </p>
-            
-            {user.isLoggedIn ? (
-                <div className="flex gap-3 justify-center">
-                    <div className="inline-flex items-center gap-2 text-xs text-amber-600 bg-amber-50 px-3 py-1 rounded-full border border-amber-100">
-                        <Calendar size={12}/> 每日限占一次
-                    </div>
-                    <button onClick={handleShowHistory} className="inline-flex items-center gap-2 text-xs text-slate-500 hover:text-slate-800 bg-white hover:bg-slate-50 px-3 py-1 rounded-full border border-slate-200 transition-colors">
-                        <History size={12}/> 往期回顾
-                    </button>
-                </div>
-            ) : (
-                <div className="flex flex-col items-center gap-2">
-                    <button onClick={() => setShowLoginModal(true)} className="px-6 py-2 bg-slate-900 text-white text-xs font-bold rounded-full shadow-lg hover:bg-slate-800 transition-all flex items-center gap-2">
-                         <User size={14}/> 账号登录 / 注册
-                    </button>
-                    <p className="text-[10px] text-slate-400 mt-2">云端同步 · 隐私加密</p>
-                </div>
+            {!user.isLoggedIn && (
+                <button onClick={() => setShowLoginModal(true)} className="px-8 py-3 bg-slate-900 text-white text-xs font-bold rounded-full shadow-lg flex items-center gap-2 mx-auto">
+                     <User size={14}/> 账号登录
+                </button>
             )}
         </div>
-
-        {/* Reuse History for Initial Screen */}
-        {showHistory && createPortal(
-            <>
-                <div 
-                    className="fixed inset-0 z-[140] bg-slate-900/30 backdrop-blur-sm animate-in fade-in duration-300"
-                    onClick={() => setShowHistory(false)}
-                />
-                <div className="fixed inset-y-0 right-0 z-[150] w-full md:w-80 bg-white shadow-2xl border-l border-slate-100 flex flex-col h-[100dvh] animate-in slide-in-from-right duration-300">
-                    <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white/80 backdrop-blur-md sticky top-0 z-10 shrink-0">
-                        <h3 className="font-serif font-bold text-slate-800 flex items-center gap-2">
-                            <History size={18}/> 每日一卦记录
-                        </h3>
-                        <button onClick={() => setShowHistory(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-                            <X size={18} className="text-slate-400"/>
-                        </button>
-                    </div>
-                    <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar overscroll-contain">
-                        {historyList.length === 0 ? (
-                            <div className="text-center py-20 text-slate-400 text-sm">
-                                <Calendar size={32} className="mx-auto mb-3 opacity-30"/>
-                                <p>正在获取云端数据...</p>
-                            </div>
-                        ) : (
-                            historyList.map((record, idx) => (
-                                <div 
-                                    key={idx} 
-                                    onClick={() => { setDailyData(record); setShowHistory(false); }}
-                                    className={`bg-white border rounded-xl p-4 cursor-pointer transition-all hover:shadow-md group border-slate-100 hover:border-amber-200`}
-                                >
-                                    <div className="flex justify-between items-start mb-2">
-                                        <div className="font-serif font-bold text-slate-800">{formatDate(record.date)}</div>
-                                        <div className={`text-xs font-bold px-1.5 py-0.5 rounded ${record.guidance.score >= 80 ? 'text-red-600 bg-red-50' : (record.guidance.score >= 60 ? 'text-amber-600 bg-amber-50' : 'text-slate-500 bg-slate-50')}`}>
-                                            {record.guidance.score}分
-                                        </div>
-                                    </div>
-                                    <div className="text-xs text-slate-500 line-clamp-2 leading-relaxed mb-2">
-                                        {record.guidance.summary}
-                                    </div>
-                                    <div className="flex items-center justify-between pt-2 border-t border-slate-50">
-                                        <div className="flex gap-1">
-                                            {record.guidance.keywords?.slice(0, 2).map((k:string, i:number) => (
-                                                <span key={i} className="text-[9px] text-slate-400 bg-slate-50 px-1 rounded">#{k}</span>
-                                            ))}
-                                        </div>
-                                        <ChevronLeft size={14} className="text-slate-300 group-hover:text-amber-400 transition-colors rotate-180"/>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                </div>
-            </>,
-            document.body
-        )}
     </div>
   );
 };

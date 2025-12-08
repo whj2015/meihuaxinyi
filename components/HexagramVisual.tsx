@@ -1,11 +1,12 @@
+
 import React from 'react';
 import { HexagramData, TrigramData } from '../types';
 
 interface Props {
   hexagram: HexagramData;
-  label: string;
-  highlight?: 'upper' | 'lower'; // Highlight indicates the 'Ti' (Body) gua
-  movingLine?: number; // 1-6, to show indicator
+  label?: string;
+  highlight?: 'upper' | 'lower'; 
+  movingLine?: number; 
 }
 
 const TrigramVisualRow: React.FC<{ 
@@ -17,57 +18,43 @@ const TrigramVisualRow: React.FC<{
   movingLineIndex?: number; 
 }> = ({ trigram, position, isTi, isYong, hasRoleContext, movingLineIndex }) => {
   
-  const lines = trigram.binary.split(''); // ['1', '1', '0'] -> [Bottom, Mid, Top]
+  const lines = trigram.binary.split(''); 
 
   return (
-    <div className="flex items-center w-full py-2 pl-2 pr-0">
-      
-      {/* Left: The Lines & Watermark Container */}
-      <div className="relative flex-1 flex justify-center py-1">
-        
-        {/* Watermark Character (Background, centered on lines) */}
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-6xl font-serif text-slate-100 pointer-events-none select-none z-0 opacity-80">
+    <div className="flex items-center w-full py-1.5 pl-1 pr-0">
+      <div className="relative flex-1 flex justify-center py-0.5">
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-5xl font-serif text-slate-100 pointer-events-none select-none z-0 opacity-60">
             {trigram.name}
         </div>
 
-        {/* The Lines */}
-        <div className="flex flex-col-reverse gap-2 w-full max-w-[120px] z-10">
+        <div className="flex flex-col-reverse gap-1.5 w-full max-w-[90px] md:max-w-[100px] z-10">
           {lines.map((bit, idx) => {
               const currentLineNumRelative = idx + 1;
               const isMoving = movingLineIndex === currentLineNumRelative;
 
               return (
-              <div key={idx} className="h-3.5 md:h-4 w-full flex justify-between relative group">
+              <div key={idx} className="h-3 md:h-3.5 w-full flex justify-between relative group">
                   {bit === '1' ? (
-                  <div className={`w-full h-full rounded-[1px] transition-colors duration-500 ${isMoving ? 'bg-amber-600' : 'bg-slate-800'}`}></div>
+                  <div className={`w-full h-full rounded-[1px] transition-colors duration-500 ${isMoving ? 'bg-amber-500' : 'bg-slate-800'}`}></div>
                   ) : (
                   <>
-                      <div className={`w-[44%] h-full rounded-[1px] transition-colors duration-500 ${isMoving ? 'bg-amber-600' : 'bg-slate-800'}`}></div>
-                      <div className={`w-[44%] h-full rounded-[1px] transition-colors duration-500 ${isMoving ? 'bg-amber-600' : 'bg-slate-800'}`}></div>
+                      <div className={`w-[44%] h-full rounded-[1px] transition-colors duration-500 ${isMoving ? 'bg-amber-500' : 'bg-slate-800'}`}></div>
+                      <div className={`w-[44%] h-full rounded-[1px] transition-colors duration-500 ${isMoving ? 'bg-amber-500' : 'bg-slate-800'}`}></div>
                   </>
                   )}
-                  
-                  {/* Moving Line Dot Indicator (Right of the line) */}
-                  {isMoving && (
-                      <div className="absolute -right-3 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-amber-600 rounded-full shadow-sm"></div>
-                  )}
+                  {isMoving && <div className="absolute -right-2.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-amber-500 rounded-full"></div>}
               </div>
               );
           })}
         </div>
       </div>
 
-      {/* Right: Dedicated Column for Ti/Yong Seal */}
-      <div className="w-12 flex justify-center shrink-0 z-20">
+      <div className="w-8 flex justify-center shrink-0 z-20">
          {hasRoleContext && isTi && (
-             <div className="w-8 h-8 rounded-[4px] border border-red-700/60 text-red-700 bg-white/50 flex items-center justify-center font-serif font-bold text-sm shadow-sm rotate-12 backdrop-blur-sm" title="体卦：代表自己">
-                 体
-             </div>
+             <div className="w-6 h-6 rounded border border-red-600/30 text-red-600 bg-red-50 flex items-center justify-center font-serif font-bold text-xs shadow-sm">体</div>
          )}
          {hasRoleContext && isYong && (
-             <div className="w-8 h-8 rounded-[4px] border border-slate-300 text-slate-400 bg-white/50 flex items-center justify-center font-serif font-bold text-sm shadow-sm -rotate-6 backdrop-blur-sm" title="用卦：代表事物">
-                 用
-             </div>
+             <div className="w-6 h-6 rounded border border-slate-200 text-slate-400 bg-white flex items-center justify-center font-serif font-bold text-xs shadow-sm">用</div>
          )}
       </div>
     </div>
@@ -80,21 +67,11 @@ const HexagramVisual: React.FC<Props> = ({ hexagram, label, highlight, movingLin
 
   return (
     <div className="flex flex-col items-center">
-        {label && (
-            <span className="text-[10px] font-sans font-bold text-slate-400 mb-3 tracking-[0.2em] uppercase">{label}</span>
-        )}
+        {label && <span className="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider">{label}</span>}
         
-        {/* 
-            Update:
-            1. Adjusted width to w-40 for mobile (was w-44) to fit better without scaling.
-            2. Added pt-8 (padding-top) to accommodate the absolute positioned sequence badge 
-               so it doesn't overlap with the top lines.
-        */}
-        <div className="flex flex-col gap-1 w-40 md:w-52 pt-8 pb-3 px-3 rounded-2xl bg-white shadow-[0_2px_15px_-5px_rgba(0,0,0,0.05)] border border-slate-100/50 relative overflow-hidden">
-             {/* Sequence Badge */}
-            <div className="absolute top-2 left-2 bg-slate-50 text-slate-300 text-[9px] px-1.5 py-0.5 rounded border border-slate-100 font-mono z-30">
-                #{hexagram.sequence}
-            </div>
+        <div className="flex flex-col gap-0.5 w-32 md:w-40 pt-2 pb-2 px-2 rounded-xl bg-white shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)] border border-slate-100 relative overflow-hidden">
+             {/* Small sequence badge at top left */}
+             <div className="absolute top-1 left-1.5 text-[8px] text-slate-300 font-mono">#{hexagram.sequence}</div>
 
             <TrigramVisualRow 
                 trigram={hexagram.upper} 
@@ -105,7 +82,7 @@ const HexagramVisual: React.FC<Props> = ({ hexagram, label, highlight, movingLin
                 movingLineIndex={movingLineUpper}
             />
 
-            <div className="h-px bg-slate-100 w-1/2 mx-auto opacity-50 my-1"></div>
+            <div className="h-px bg-slate-100 w-2/3 mx-auto my-0.5"></div>
 
             <TrigramVisualRow 
                 trigram={hexagram.lower} 
@@ -117,15 +94,11 @@ const HexagramVisual: React.FC<Props> = ({ hexagram, label, highlight, movingLin
             />
         </div>
         
-        {/* Hexagram Name & Info */}
-        <div className="mt-4 text-center">
-            <h3 className="text-xl font-bold font-serif text-slate-800 tracking-wide">{hexagram.name}</h3>
-            <div className="mt-2 flex flex-col gap-0.5">
-                <div className="text-[10px] text-slate-500 font-medium font-sans">
-                   上{hexagram.upper.name}{hexagram.upper.nature}<span className="text-slate-300 mx-1">/</span>五行属{hexagram.upper.element}
-                </div>
-                <div className="text-[10px] text-slate-500 font-medium font-sans">
-                   下{hexagram.lower.name}{hexagram.lower.nature}<span className="text-slate-300 mx-1">/</span>五行属{hexagram.lower.element}
+        <div className="mt-2 text-center">
+            <h3 className="text-base font-bold font-serif text-slate-800 tracking-wide">{hexagram.name}</h3>
+            <div className="mt-0.5 flex flex-col gap-0">
+                <div className="text-[9px] text-slate-400 font-medium scale-90 origin-center">
+                   上{hexagram.upper.name}{hexagram.upper.nature} · 下{hexagram.lower.name}{hexagram.lower.nature}
                 </div>
             </div>
         </div>
