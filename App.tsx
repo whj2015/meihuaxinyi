@@ -58,7 +58,7 @@ export default function App() {
       
       {/* Mobile Bottom Navigation Bar - Floating Style */}
       <div className="md:hidden fixed bottom-6 left-6 right-6 z-50">
-        <div className="bg-slate-900/90 backdrop-blur-xl rounded-2xl shadow-2xl shadow-slate-900/20 border border-slate-800 flex justify-between items-center px-8 py-4">
+        <div className="bg-slate-900/90 backdrop-blur-xl rounded-2xl shadow-2xl shadow-slate-900/20 border border-slate-800 flex justify-between items-center px-12 py-4">
             <MobileNavItem active={activeTab === 'practice'} onClick={() => setActiveTab('practice')} icon={<Compass size={20} />} label="起卦" />
             <MobileNavItem active={activeTab === 'library'} onClick={() => setActiveTab('library')} icon={<Library size={20} />} label="卦典" />
             <MobileNavItem active={activeTab === 'learn'} onClick={() => setActiveTab('learn')} icon={<BookOpen size={20} />} label="心法" />

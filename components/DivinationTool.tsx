@@ -7,7 +7,7 @@ import HexagramVisual from './HexagramVisual';
 import { getInterpretation } from '../services/geminiService';
 import AuthModal from './AuthModal';
 import DailyDivination from './DailyDivination';
-import { Sparkles, ArrowLeft, RefreshCcw, Settings, X, Check, User, LogOut, RotateCcw, Loader2, Quote, BookOpen, Activity, History, ChevronRight, Lock, Hash, Calendar, ArrowRight } from 'lucide-react';
+import { Sparkles, ArrowLeft, RefreshCcw, Settings, X, Check, User, LogOut, RotateCcw, Loader2, Quote, BookOpen, Activity, History, ChevronRight, Lock, Hash, Calendar, ArrowRight, Wallet } from 'lucide-react';
 
 // --- Markdown Renderer ---
 const FormattedMarkdown: React.FC<{ text: string }> = ({ text }) => {
@@ -92,6 +92,54 @@ const NumberSlot: React.FC<{ value: string; label: string; subLabel: string; onC
     );
 };
 
+// --- Profile / Settings Modal ---
+const ProfileModal: React.FC<{ user: UserProfile; onClose: () => void; onLogout: () => void; onRecharge: () => void }> = ({ user, onClose, onLogout, onRecharge }) => {
+    return createPortal(
+        <div className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+            <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
+                 <div className="absolute top-0 right-0 w-32 h-32 bg-amber-50 rounded-full blur-3xl -z-0 pointer-events-none opacity-50 translate-x-10 -translate-y-10"></div>
+                 
+                 <div className="flex justify-between items-start mb-6 relative z-10">
+                     <div className="flex items-center gap-3">
+                         <div className="w-12 h-12 bg-slate-900 text-white rounded-full flex items-center justify-center text-xl font-bold font-serif shadow-lg">
+                             {user.username.charAt(0).toUpperCase()}
+                         </div>
+                         <div>
+                             <h3 className="font-bold text-slate-900 text-lg">{user.username}</h3>
+                             <p className="text-xs text-slate-400 uppercase tracking-wider">Member</p>
+                         </div>
+                     </div>
+                     <button onClick={onClose} className="p-2 bg-slate-50 rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+                         <X size={18}/>
+                     </button>
+                 </div>
+                 
+                 <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 mb-6 relative z-10">
+                     <div className="flex justify-between items-center mb-1">
+                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Credits</span>
+                         <span className="text-amber-600 font-bold flex items-center gap-1 text-sm"><Sparkles size={12}/> 灵力点数</span>
+                     </div>
+                     <div className="flex items-end gap-2">
+                         <span className="text-3xl font-bold text-slate-900 font-serif">{user.credits || 0}</span>
+                         <span className="text-xs text-slate-400 mb-1.5">pts</span>
+                     </div>
+                     <button 
+                        onClick={onRecharge}
+                        className="mt-3 w-full py-2 bg-white border border-amber-200 text-amber-700 rounded-lg text-xs font-bold shadow-sm hover:shadow-md hover:bg-amber-50 transition-all flex items-center justify-center gap-2"
+                     >
+                         <Wallet size={14}/> 充值点数 (模拟)
+                     </button>
+                 </div>
+                 
+                 <button onClick={onLogout} className="w-full py-3 rounded-xl border border-slate-200 text-slate-500 text-sm font-bold hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-all flex items-center justify-center gap-2">
+                     <LogOut size={16}/> 退出登录
+                 </button>
+            </div>
+        </div>,
+        document.body
+    );
+};
+
 // --- Main Component ---
 const DivinationTool: React.FC = () => {
   // Mode Selection: 'menu', 'digital', 'daily'
@@ -104,7 +152,7 @@ const DivinationTool: React.FC = () => {
   const [loadingAI, setLoadingAI] = useState(false);
   const [aiInterpretation, setAiInterpretation] = useState<string | null>(null);
 
-  const [showSettings, setShowSettings] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [showHistory, setShowHistory] = useState(false); 
   const [showLoginModal, setShowLoginModal] = useState(false);
 
@@ -145,6 +193,18 @@ const DivinationTool: React.FC = () => {
   const handleLogout = () => {
     setUser({ username: '', isLoggedIn: false });
     localStorage.removeItem('user_profile');
+    setMode('menu');
+    setShowProfile(false);
+  };
+  
+  const handleRecharge = async () => {
+      // Mock recharge
+      const newCredits = (user.credits || 0) + 10;
+      // In real app, call API. For now, update local state
+      const updatedUser = { ...user, credits: newCredits };
+      setUser(updatedUser);
+      localStorage.setItem('user_profile', JSON.stringify(updatedUser));
+      alert("充值成功！(模拟)");
   };
 
   const handleCalculate = async () => {
@@ -224,9 +284,19 @@ const DivinationTool: React.FC = () => {
   if (mode === 'menu') {
       return (
         <div className="max-w-4xl mx-auto px-4 py-8 animate-in fade-in slide-in-from-bottom-8 duration-500">
-             <div className="text-center mb-12">
-                 <h2 className="text-3xl font-serif font-bold text-slate-900 mb-2">易学实践</h2>
-                 <p className="text-slate-500 text-sm">选择一种方式，探索未知的指引</p>
+             {showProfile && <ProfileModal user={user} onClose={()=>setShowProfile(false)} onLogout={handleLogout} onRecharge={handleRecharge}/>}
+             
+             <div className="flex justify-between items-center mb-12">
+                 <div>
+                    <h2 className="text-3xl font-serif font-bold text-slate-900 mb-1">易学实践</h2>
+                    <p className="text-slate-500 text-sm">选择一种方式，探索未知的指引</p>
+                 </div>
+                 <button onClick={() => setShowProfile(true)} className="flex flex-col items-center gap-1 group">
+                     <div className="w-10 h-10 bg-slate-900 text-white rounded-full flex items-center justify-center font-bold font-serif shadow-lg group-hover:bg-amber-500 transition-colors">
+                        {user.username.charAt(0).toUpperCase()}
+                     </div>
+                     <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest group-hover:text-amber-600">Profile</span>
+                 </button>
              </div>
              
              <div className="grid md:grid-cols-2 gap-6">
@@ -290,21 +360,6 @@ const DivinationTool: React.FC = () => {
   // --- RENDER: Digital Divination Mode (Existing Logic) ---
   return (
       <div className="w-full space-y-8 pb-32 animate-in slide-in-from-right-8 fade-in duration-300">
-        {/* Settings Modal */}
-        {showSettings && (
-             <div className="fixed inset-0 z-[150] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-                 <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-6">
-                     <div className="flex justify-between items-center">
-                         <h3 className="font-bold text-lg">设置</h3>
-                         <button onClick={() => setShowSettings(false)}><X/></button>
-                     </div>
-                     <div className="flex justify-end">
-                        <button onClick={() => setShowSettings(false)} className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm">完成</button>
-                     </div>
-                 </div>
-             </div>
-        )}
-
         {/* --- The Input Engine --- */}
         <div className="bg-[#fcfbf9] p-2 rounded-[2rem] shadow-[0_8px_30px_-12px_rgba(0,0,0,0.1)] border border-slate-200/60 relative overflow-hidden max-w-2xl mx-auto">
             <div className="bg-white rounded-[1.5rem] p-6 md:p-8 space-y-6 relative z-10">

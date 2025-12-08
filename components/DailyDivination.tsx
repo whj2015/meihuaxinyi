@@ -6,7 +6,7 @@ import { DivinationResult, AIProvider, UserProfile } from '../types';
 import { getDailyGuidance } from '../services/geminiService';
 import HexagramVisual from './HexagramVisual';
 import AuthModal from './AuthModal';
-import { History, X, User, Lock, Quote, ArrowLeft } from 'lucide-react';
+import { History, X, User, Lock, Quote, ArrowLeft, Loader2 } from 'lucide-react';
 
 interface DailyData {
   date: string; 
@@ -56,6 +56,7 @@ const DailyDivination: React.FC<DailyDivinationProps> = ({ onBack }) => {
   const [showLoginModal, setShowLoginModal] = useState(false);
   
   const [isAnimating, setIsAnimating] = useState(false);
+  const [isCheckingToday, setIsCheckingToday] = useState(true); // Default true to prevent flash
   const [loadingState, setLoadingState] = useState<'idle' | 'shuffling' | 'calculating' | 'interpreting'>('idle');
 
   const [provider, setProvider] = useState<AIProvider>('deepseek');
@@ -69,10 +70,21 @@ const DailyDivination: React.FC<DailyDivinationProps> = ({ onBack }) => {
             const parsedUser = JSON.parse(savedUserStr);
             if (parsedUser.username !== user.username || parsedUser.token !== user.token) {
                 setUser(parsedUser);
-                if (parsedUser.isLoggedIn && parsedUser.token) fetchTodayData(parsedUser.token);
+                if (parsedUser.isLoggedIn && parsedUser.token) {
+                    setIsCheckingToday(true);
+                    fetchTodayData(parsedUser.token);
+                } else {
+                    setIsCheckingToday(false);
+                }
+            } else if (parsedUser.isLoggedIn && !dailyData) {
+                // Same user re-mounting or refreshing
+                fetchTodayData(parsedUser.token);
             }
-        } else if (user.isLoggedIn) {
-            handleLogout();
+        } else {
+            setIsCheckingToday(false);
+            if (user.isLoggedIn) {
+                handleLogout();
+            }
         }
     };
     loadUser();
@@ -90,9 +102,15 @@ const DailyDivination: React.FC<DailyDivinationProps> = ({ onBack }) => {
       try {
         const today = new Date().toISOString().split('T')[0];
         const res = await fetch(`/api/daily-reading?date=${today}`, { headers: { 'Authorization': `Bearer ${token}` } });
-        const json = await res.json();
-        if (json.success && json.data) setDailyData(json.data);
-      } catch (e) { setDailyData(null); }
+        if (res.ok) {
+            const json = await res.json();
+            if (json.success && json.data) setDailyData(json.data);
+        }
+      } catch (e) { 
+          setDailyData(null); 
+      } finally {
+          setIsCheckingToday(false);
+      }
   };
 
   const fetchHistoryData = async () => {
@@ -118,7 +136,10 @@ const DailyDivination: React.FC<DailyDivinationProps> = ({ onBack }) => {
 
   const handleLoginSuccess = (newUser: UserProfile) => {
       setUser(newUser);
-      if (newUser.token) fetchTodayData(newUser.token);
+      if (newUser.token) {
+          setIsCheckingToday(true);
+          fetchTodayData(newUser.token);
+      }
   };
 
   const handleLogout = () => {
@@ -126,6 +147,7 @@ const DailyDivination: React.FC<DailyDivinationProps> = ({ onBack }) => {
       localStorage.removeItem('user_profile');
       setDailyData(null);
       setHistoryList([]);
+      setIsCheckingToday(false);
       window.dispatchEvent(new Event("storage"));
   };
 
@@ -202,7 +224,7 @@ const DailyDivination: React.FC<DailyDivinationProps> = ({ onBack }) => {
      const isToday = date === new Date().toISOString().split('T')[0];
 
      return (
-        <div className="max-w-lg mx-auto pb-24 px-0 md:px-4 pt-2">
+        <div className="max-w-lg mx-auto pb-24 px-0 md:px-4 pt-2 animate-in fade-in slide-in-from-bottom-4 duration-500">
              <AuthModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} onSuccess={handleLoginSuccess}/>
 
              {/* Header Actions */}
@@ -324,6 +346,18 @@ const DailyDivination: React.FC<DailyDivinationProps> = ({ onBack }) => {
              )}
         </div>
      );
+  }
+  
+  // --- View: Checking State ---
+  if (isCheckingToday && user.isLoggedIn) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[60vh] animate-in fade-in duration-500">
+             <div className="relative">
+                 <Loader2 className="w-8 h-8 text-slate-300 animate-spin" />
+             </div>
+             <p className="text-xs text-slate-400 font-serif tracking-widest mt-4">查询今日记录...</p>
+        </div>
+      );
   }
 
   // --- View: Initial Start Screen (Embedded Mode) ---
