@@ -371,7 +371,7 @@ const DivinationTool: React.FC = () => {
                         </button>
                         <div>
                             <h2 className="text-2xl font-serif font-bold text-slate-900">灵数起卦</h2>
-                            <p className="text-xs text-slate-400 mt-1">请输入三个三位数，或随机生成</p>
+                            <p className="text-xs text-slate-400 mt-1">请输入三个数字，或随机生成</p>
                         </div>
                     </div>
                     <div className="flex gap-2">
