@@ -1,113 +1,142 @@
-# 梅花心易 (Mind I-Ching) - 易学启蒙与实践平台
+# 梅花心易 (Meihuaxinyi)
 
-> **"万物皆有数，心动即天机"**
+> **易学启蒙与实践**  
+> 探索东方智慧，结合现代 AI 技术，为易学爱好者打造的智能起卦与解卦平台。
 
-梅花心易是一个致力于易学启蒙与实践的现代化 Web 应用。我们旨在剥离传统易学中复杂的迷信色彩，回归纯粹的易理逻辑，通过现代技术手段帮助用户理解和运用梅花易数。
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![React](https://img.shields.io/badge/React-19.0-61dafb.svg)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178c6.svg)
+![Vite](https://img.shields.io/badge/Vite-6.0-646cff.svg)
+![Cloudflare](https://img.shields.io/badge/Cloudflare-Pages-orange.svg)
 
-## ✨ 功能特性
+## 📖 项目简介
 
-### 1. 📖 心法 (Learn)
-- **交互式学习路线图**：清晰展示梅花易数的学习路径，从基础八卦到高阶断卦技巧。
-- **易理逻辑解析**：深入浅出地讲解易学核心概念，帮助初学者建立正确的易学世界观。
+**梅花心易** 是一款基于梅花易数（Meihua Yishu）逻辑的现代化易学应用。它不仅提供了传统的起卦工具，还创新性地融合了 Google Gemini 和 DeepSeek 等先进的大语言模型，为用户提供深度的卦象解读和生活指引。
 
-### 2. 📚 卦典 (Library)
-- **64卦完整收录**：提供完整的六十四卦查询功能。
-- **详解与白话**：每卦均包含卦辞、大象、爻辞的原典及现代白话注解。
-- **搜索功能**：支持快速查找卦象。
+本项目旨在帮助用户：
+- **轻松起卦**：通过数字化手段快速获取卦象。
+- **深度理解**：利用 AI 辅助解读卦辞、爻辞及五行生克关系。
+- **系统学习**：通过循序渐进的学习路径掌握易学核心概念。
+- **每日指引**：获取每日运势分析，指导生活决策。
 
-### 3. 🔮 演练 (Practice)
-- **数字化起卦**：支持数字起卦（先天卦）等多种起卦方式。
-- **实时排盘**：自动计算本卦、互卦、变卦，以及体用关系。
-- **动爻分析**：精准定位动爻，展示变卦过程。
+## ✨ 核心功能
 
-### 4. 🤖 AI 解卦 (AI Interpretation)
-- **智能分析**：集成 Google Gemini / DeepSeek AI 模型，提供现代化的卦象解读。
-- **多维度解读**：结合传统易理与现代语境，为用户提供更具参考价值的建议。
+### 1. 智能起卦 (Divination Tool)
+- **多种起卦方式**：支持时间起卦、数字起卦等多种传统梅花易数起卦法。
+- **直观展示**：清晰展示本卦、互卦、变卦及其卦画。
+- **五行分析**：自动计算体用关系、五行生克，辅助判断吉凶。
+
+### 2. AI 智能解卦 (AI Interpretation)
+- **多模型支持**：集成 Google Gemini 和 DeepSeek 模型。
+- **深度推理**：AI 模拟国学大师思维，结合“取象比类”与具体问题场景进行发散性推理。
+- **结构化输出**：提供核心直断、象意推演、局势演变及大师忠告等结构化解读。
+
+### 3. 每日一卦 (Daily Guidance)
+- **每日运势**：每天抽取一卦，获取今日运势评分、关键词及行动指南。
+- **生活化建议**：将深奥的易理转化为通俗易懂的生活建议（宜/忌）。
+
+### 4. 易学心法 (Learning Roadmap)
+- **循序渐进**：提供从基础八卦到高阶断卦的学习路线图。
+- **知识库**：内置丰富的易学知识点，帮助新手快速入门。
+
+### 5. 卦典查询 (Hexagram Library)
+- **完整收录**：收录六十四卦完整卦辞、爻辞及大象传。
+- **便捷检索**：支持快速查找和浏览特定卦象信息。
 
 ## 🛠️ 技术栈
 
-本项目采用现代化的前端技术栈构建，确保高性能与良好的用户体验。
+### 前端 (Frontend)
+- **框架**: React 19
+- **构建工具**: Vite
+- **语言**: TypeScript
+- **样式**: Tailwind CSS
+- **图标**: Lucide React
+- **动画**: Tailwind CSS Animate
 
-- **前端框架**: [React 19](https://react.dev/)
-- **构建工具**: [Vite](https://vitejs.dev/)
-- **语言**: [TypeScript](https://www.typescriptlang.org/)
-- **样式**: [Tailwind CSS](https://tailwindcss.com/)
-- **图标**: [Lucide React](https://lucide.dev/)
-- **AI 集成**: [Google GenAI SDK](https://ai.google.dev/)
-- **部署**: [Cloudflare Pages](https://pages.cloudflare.com/)
-- **数据库**: [Cloudflare D1](https://developers.cloudflare.com/d1/)
+### 后端 (Backend / Serverless)
+- **平台**: Cloudflare Pages Functions
+- **数据库**: Cloudflare D1 (SQLite)
+- **AI 服务**: Google Gemini API, DeepSeek API
 
 ## 🚀 快速开始
 
 ### 前置要求
-- [Node.js](https://nodejs.org/) (推荐 v18 或更高版本)
-- npm 或 yarn
+- Node.js (v18+)
+- pnpm 或 npm
+- Cloudflare Wrangler CLI (用于本地开发后端函数)
 
-### 安装
+### 安装依赖
 
-1. 克隆项目到本地：
-   ```bash
-   git clone <repository-url>
-   cd meihuaxinyi
-   ```
-
-2. 安装依赖：
-   ```bash
-   npm install
-   ```
-
-### 开发
-
-启动本地开发服务器：
 ```bash
+# 克隆项目
+git clone https://github.com/your-username/meihuaxinyi.git
+cd meihuaxinyi
+
+# 安装依赖
+npm install
+```
+
+### 配置环境变量
+
+在项目根目录创建 `.dev.vars` 文件（用于本地 Wrangler 开发），配置以下变量：
+
+```env
+# JWT 密钥 (用于用户认证)
+JWT_SECRET=your_jwt_secret_here
+
+# 数据加密密钥 (用于加密存储的 API Key)
+DATA_SECRET=your_data_encryption_secret_here
+
+# 系统默认 AI Key (可选，作为后备 Key)
+DEFAULT_GEMINI_KEY=your_gemini_api_key
+DEFAULT_DEEPSEEK_KEY=your_deepseek_api_key
+```
+
+### 本地开发
+
+```bash
+# 启动前端 + 后端函数 (推荐)
+npx wrangler pages dev . -- pnpm run dev
+
+# 仅启动前端 (无后端功能)
 npm run dev
 ```
-访问 `http://localhost:5173` 即可预览应用。
 
-### 构建
+### 数据库初始化
 
-构建生产环境版本：
-```bash
-npm run build
-```
-构建产物将输出到 `dist` 目录。
+本项目使用 Cloudflare D1。首次运行时，后端会自动尝试创建必要的表结构（如 `users`, `credit_logs`）。
 
-### 预览
-
-预览构建后的应用：
-```bash
-npm run preview
-```
-
-## 📂 项目结构
+## 📂 目录结构
 
 ```
 meihuaxinyi/
-├── components/       # UI 组件
-│   ├── Roadmap.tsx       # 学习路线图组件
-│   ├── DivinationTool.tsx # 起卦演练工具
-│   ├── HexagramLib.tsx    # 卦典库组件
+├── components/       # React 组件
+│   ├── DivinationTool.tsx  # 起卦核心组件
+│   ├── Roadmap.tsx         # 学习路径组件
+│   ├── HexagramLib.tsx     # 卦典组件
 │   └── ...
-├── utils/            # 核心逻辑与工具函数
-│   ├── meiHuaLogic.ts    # 梅花易数排盘逻辑
-│   ├── ichingData.ts     # 易经数据（卦辞、爻辞等）
+├── functions/        # Cloudflare Pages Functions (后端 API)
+│   ├── api/
+│   │   ├── ai-proxy.js     # AI 代理接口
+│   │   └── ...
 │   └── ...
-├── services/         # 外部服务集成
-│   └── geminiService.ts  # AI 服务接口
-├── types.ts          # TypeScript 类型定义
-├── constants.ts      # 常量定义（八卦属性、六十四卦名等）
-├── App.tsx           # 应用主入口
+├── services/         # 前端服务层
+│   └── geminiService.ts    # AI 服务调用逻辑
+├── utils/            # 工具函数
+├── App.tsx           # 主应用入口
 └── ...
 ```
 
-## 🧠 核心概念简述
+## 🤝 贡献指南
 
-- **体用 (Ti/Yong)**：梅花易数的核心分析方法。"体"代表自己或主体，"用"代表事物或客体。通过五行生克关系判断吉凶。
-- **本互变 (Ben/Hu/Bian)**：
-    - **本卦**：事情的开始或现状。
-    - **互卦**：事情发展的过程或中间状态。
-    - **变卦**：事情的结局或最终走向。
+欢迎提交 Issue 和 Pull Request 来改进本项目！
+
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 提交 Pull Request
 
 ## 📄 许可证
 
-[MIT License](LICENSE)
+本项目采用 [MIT](LICENSE) 许可证。
