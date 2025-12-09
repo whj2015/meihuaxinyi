@@ -13,6 +13,24 @@ export async function onRequest(context) {
     return await verifyJwt(token, env.JWT_SECRET);
   }
 
+  // 确保 history 表存在
+  try {
+    await env.DB.prepare(`
+      CREATE TABLE IF NOT EXISTS history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL,
+        question TEXT,
+        n1 INTEGER,
+        n2 INTEGER,
+        n3 INTEGER,
+        ai_response TEXT,
+        timestamp INTEGER
+      )
+    `).run();
+  } catch (e) {
+    console.error("Create history table failed", e);
+  }
+
   try {
     const userPayload = await getAuthUser();
     

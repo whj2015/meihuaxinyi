@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { calculateDivination } from '../utils/meiHuaLogic';
@@ -649,7 +650,25 @@ const DivinationTool: React.FC = () => {
                     </div>
                     <div className="space-y-3">
                         {historyList.map((record) => (
-                            <div key={record.id} onClick={() => { /* Restore logic */ setShowHistory(false); }} className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:shadow-md transition-all cursor-pointer">
+                            <div 
+                                key={record.id} 
+                                onClick={() => { 
+                                    setInputs([record.n1.toString(), record.n2.toString(), record.n3.toString()]);
+                                    setQuestion(record.question);
+                                    
+                                    // 重新计算并恢复结果
+                                    const res = calculateDivination(record.n1, record.n2, record.n3);
+                                    setResult(res);
+                                    
+                                    // 恢复 AI 解读（如果有）
+                                    setAiInterpretation(record.ai_response || null);
+                                    
+                                    setShowHistory(false);
+                                    // 滚动到结果区域
+                                    setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+                                }} 
+                                className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:shadow-md transition-all cursor-pointer"
+                            >
                                 <div className="font-bold text-slate-800 mb-1">{record.question || "无题"}</div>
                                 <div className="text-xs text-slate-400 flex justify-between">
                                     <span>{new Date(record.timestamp).toLocaleDateString()}</span>
